@@ -475,9 +475,12 @@ tbody tr:hover { background: var(--surface2); }
 
       <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn btn-secondary" onclick="loadSampleData()">📊 <span class="t" data-he="נתוני דוגמה" data-en="Sample Data">נתוני דוגמה</span></button>
-        <button class="btn btn-secondary" onclick="exportBackup()">💾 <span class="t" data-he="גיבוי" data-en="Backup">גיבוי</span></button>
-        <button class="btn btn-secondary" onclick="document.getElementById('backupInput').click()">📥 <span class="t" data-he="שחזור" data-en="Restore">שחזור</span></button>
+        <button class="btn btn-secondary" onclick="exportBackup()">💾 <span class="t" data-he="גיבוי JSON" data-en="JSON Backup">גיבוי JSON</span></button>
+        <button class="btn btn-secondary" onclick="document.getElementById('backupInput').click()">📥 <span class="t" data-he="שחזור JSON" data-en="JSON Restore">שחזור JSON</span></button>
         <input type="file" id="backupInput" accept=".json" style="display:none" onchange="importBackup(this.files[0])">
+        <button class="btn btn-secondary" onclick="exportBackupXLSX()">📊 <span class="t" data-he="ייצא Excel" data-en="Export Excel">ייצא Excel</span></button>
+        <button class="btn btn-secondary" onclick="document.getElementById('xlsxBackupInput').click()">📂 <span class="t" data-he="טען מ-Excel" data-en="Import Excel">טען מ-Excel</span></button>
+        <input type="file" id="xlsxBackupInput" accept=".xlsx,.xls" style="display:none" onchange="importBackupXLSX(this.files[0])">
         <div style="flex:1;"></div>
         <button class="btn btn-danger" onclick="clearAllData()">🗑️ <span class="t" data-he="מחק הכל" data-en="Clear All">מחק הכל</span></button>
       </div>
@@ -1435,6 +1438,78 @@ async function importBackup(file) {
     }
   };
   reader.readAsText(file);
+}
+
+// ===== EXCEL BACKUP / RESTORE =====
+function exportBackupXLSX() {
+  if (!transactions.length) {
+    showToast(lang==='he' ? 'אין עסקאות לייצוא' : 'No transactions to export', 'warn');
+    return;
+  }
+  const rows = transactions.map(tx => ({
+    'תאריך': tx.date || '',
+    'בית עסק': tx.merchant || '',
+    'סכום': tx.amount !== undefined ? tx.amount : '',
+    'קטגוריה': tx.category || '',
+    'מקור': tx.source || '',
+    'הערות': tx.notes || '',
+    'כרטיס': tx.card || '',
+    'מטבע מקורי': tx.foreignCurrency || '',
+    'סכום מקורי': tx.originalAmount || '',
+    '__expIL_id__': tx.id !== undefined ? tx.id : ''
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'עסקאות');
+  XLSX.writeFile(wb, `expenseIL_${new Date().toISOString().substring(0,10)}.xlsx`);
+  showToast(lang==='he' ? `${transactions.length} עסקאות יוצאו ל-Excel!` : `${transactions.length} transactions exported to Excel!`, 'success');
+}
+
+function importBackupXLSX(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      if (!rows.length) { showToast(lang==='he' ? 'הקובץ ריק' : 'File is empty', 'error'); return; }
+      // Detect app-export format: must have our key columns
+      const first = rows[0];
+      const isAppFormat = ('תאריך' in first) && ('בית עסק' in first) && ('סכום' in first) && ('__expIL_id__' in first);
+      if (!isAppFormat) {
+        showToast(lang==='he' ? 'קובץ זה אינו גיבוי ExpenseIL — לייבוא דפי חיוב השתמש בייבוא הרגיל' : 'This is not an ExpenseIL backup — use regular import for credit card files', 'error');
+        return;
+      }
+      const imported = rows.map(r => {
+        const tx = {
+          date: r['תאריך'] ? String(r['תאריך']) : '',
+          merchant: r['בית עסק'] ? String(r['בית עסק']) : '',
+          amount: parseFloat(r['סכום']) || 0,
+          category: r['קטגוריה'] ? String(r['קטגוריה']) : '',
+          source: r['מקור'] ? String(r['מקור']) : 'imported',
+          id: r['__expIL_id__'] !== '' ? Number(r['__expIL_id__']) : (Date.now() + Math.random())
+        };
+        if (r['הערות']) tx.notes = String(r['הערות']);
+        if (r['כרטיס']) tx.card = String(r['כרטיס']);
+        if (r['מטבע מקורי']) tx.foreignCurrency = String(r['מטבע מקורי']);
+        if (r['סכום מקורי'] !== '') tx.originalAmount = parseFloat(r['סכום מקורי']);
+        return tx;
+      }).filter(tx => tx.date && tx.merchant);
+      if (!imported.length) { showToast(lang==='he' ? 'לא נמצאו עסקאות תקינות' : 'No valid transactions found', 'error'); return; }
+      const { unique } = deduplicateNew(imported);
+      transactions = transactions.concat(unique);
+      await saveData();
+      refreshAll();
+      showToast(lang==='he' ? `יובאו ${unique.length} עסקאות חדשות מ-Excel (${imported.length - unique.length} כפולות דולגו)` : `Imported ${unique.length} new transactions from Excel (${imported.length - unique.length} duplicates skipped)`, 'success');
+    } catch(err) {
+      showToast(lang==='he' ? 'שגיאה בקריאת קובץ Excel' : 'Error reading Excel file', 'error');
+    }
+    // Reset input so same file can be re-imported if needed
+    document.getElementById('xlsxBackupInput').value = '';
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 // ===== MANUAL ADD =====

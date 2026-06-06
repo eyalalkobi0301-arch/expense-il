@@ -475,9 +475,12 @@ tbody tr:hover { background: var(--surface2); }
 
       <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn btn-secondary" onclick="loadSampleData()">📊 <span class="t" data-he="נתוני דוגמה" data-en="Sample Data">נתוני דוגמה</span></button>
-        <button class="btn btn-secondary" onclick="exportBackup()">💾 <span class="t" data-he="גיבוי" data-en="Backup">גיבוי</span></button>
-        <button class="btn btn-secondary" onclick="document.getElementById('backupInput').click()">📥 <span class="t" data-he="שחזור" data-en="Restore">שחזור</span></button>
+        <button class="btn btn-secondary" onclick="exportBackup()">💾 <span class="t" data-he="גיבוי JSON" data-en="JSON Backup">גיבוי JSON</span></button>
+        <button class="btn btn-secondary" onclick="document.getElementById('backupInput').click()">📥 <span class="t" data-he="שחזור JSON" data-en="JSON Restore">שחזור JSON</span></button>
         <input type="file" id="backupInput" accept=".json" style="display:none" onchange="importBackup(this.files[0])">
+        <button class="btn btn-secondary" onclick="exportBackupXLSX()">📊 <span class="t" data-he="ייצא Excel" data-en="Export Excel">ייצא Excel</span></button>
+        <button class="btn btn-secondary" onclick="document.getElementById('xlsxBackupInput').click()">📂 <span class="t" data-he="טען מ-Excel" data-en="Import Excel">טען מ-Excel</span></button>
+        <input type="file" id="xlsxBackupInput" accept=".xlsx,.xls" style="display:none" onchange="importBackupXLSX(this.files[0])">
         <div style="flex:1;"></div>
         <button class="btn btn-danger" onclick="clearAllData()">🗑️ <span class="t" data-he="מחק הכל" data-en="Clear All">מחק הכל</span></button>
       </div>
@@ -1437,6 +1440,78 @@ async function importBackup(file) {
   reader.readAsText(file);
 }
 
+// ===== EXCEL BACKUP / RESTORE =====
+function exportBackupXLSX() {
+  if (!transactions.length) {
+    showToast(lang==='he' ? 'אין עסקאות לייצוא' : 'No transactions to export', 'warn');
+    return;
+  }
+  const rows = transactions.map(tx => ({
+    'תאריך': tx.date || '',
+    'בית עסק': tx.merchant || '',
+    'סכום': tx.amount !== undefined ? tx.amount : '',
+    'קטגוריה': tx.category || '',
+    'מקור': tx.source || '',
+    'הערות': tx.notes || '',
+    'כרטיס': tx.card || '',
+    'מטבע מקורי': tx.foreignCurrency || '',
+    'סכום מקורי': tx.originalAmount || '',
+    '__expIL_id__': tx.id !== undefined ? tx.id : ''
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'עסקאות');
+  XLSX.writeFile(wb, `expenseIL_${new Date().toISOString().substring(0,10)}.xlsx`);
+  showToast(lang==='he' ? `${transactions.length} עסקאות יוצאו ל-Excel!` : `${transactions.length} transactions exported to Excel!`, 'success');
+}
+
+function importBackupXLSX(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      if (!rows.length) { showToast(lang==='he' ? 'הקובץ ריק' : 'File is empty', 'error'); return; }
+      // Detect app-export format: must have our key columns
+      const first = rows[0];
+      const isAppFormat = ('תאריך' in first) && ('בית עסק' in first) && ('סכום' in first) && ('__expIL_id__' in first);
+      if (!isAppFormat) {
+        showToast(lang==='he' ? 'קובץ זה אינו גיבוי ExpenseIL — לייבוא דפי חיוב השתמש בייבוא הרגיל' : 'This is not an ExpenseIL backup — use regular import for credit card files', 'error');
+        return;
+      }
+      const imported = rows.map(r => {
+        const tx = {
+          date: r['תאריך'] ? String(r['תאריך']) : '',
+          merchant: r['בית עסק'] ? String(r['בית עסק']) : '',
+          amount: parseFloat(r['סכום']) || 0,
+          category: r['קטגוריה'] ? String(r['קטגוריה']) : '',
+          source: r['מקור'] ? String(r['מקור']) : 'imported',
+          id: r['__expIL_id__'] !== '' ? Number(r['__expIL_id__']) : (Date.now() + Math.random())
+        };
+        if (r['הערות']) tx.notes = String(r['הערות']);
+        if (r['כרטיס']) tx.card = String(r['כרטיס']);
+        if (r['מטבע מקורי']) tx.foreignCurrency = String(r['מטבע מקורי']);
+        if (r['סכום מקורי'] !== '') tx.originalAmount = parseFloat(r['סכום מקורי']);
+        return tx;
+      }).filter(tx => tx.date && tx.merchant);
+      if (!imported.length) { showToast(lang==='he' ? 'לא נמצאו עסקאות תקינות' : 'No valid transactions found', 'error'); return; }
+      const { unique } = deduplicateNew(imported);
+      transactions = transactions.concat(unique);
+      await saveData();
+      refreshAll();
+      showToast(lang==='he' ? `יובאו ${unique.length} עסקאות חדשות מ-Excel (${imported.length - unique.length} כפולות דולגו)` : `Imported ${unique.length} new transactions from Excel (${imported.length - unique.length} duplicates skipped)`, 'success');
+    } catch(err) {
+      showToast(lang==='he' ? 'שגיאה בקריאת קובץ Excel' : 'Error reading Excel file', 'error');
+    }
+    // Reset input so same file can be re-imported if needed
+    document.getElementById('xlsxBackupInput').value = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
 // ===== MANUAL ADD =====
 async function addManual() {
   const date = document.getElementById('manualDate').value;
@@ -2312,124 +2387,4 @@ async function handleSyncClick() {
       : `Signed in as ${firebaseUser.email}\nSign out?`)) {
       await firebase.auth().signOut();
     }
-    return;
-  }
-  // Check PIN first — if no PIN set, prompt to create one
-  if (!cryptoKey) {
-    if (!localStorage.getItem('expIL_enc')) {
-      // No encrypted data at all — need to set up PIN first
-      showPinScreen('setup');
-      showToast(lang==='he' ? 'הגדר קוד PIN קודם — הוא נדרש לסנכרון מאובטח' : 'Set a PIN first — required for secure sync', 'warn');
-    } else {
-      // Encrypted data exists but not unlocked — show unlock screen
-      showPinScreen('unlock');
-      showToast(lang==='he' ? 'הזן קוד PIN כדי לפתוח ולסנכרן' : 'Enter PIN to unlock and sync', 'warn');
-    }
-    return;
-  }
-  // Sign in with Google popup
-  try {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    await firebase.auth().signInWithPopup(provider);
-  } catch(e) {
-    if (e.code !== 'auth/popup-closed-by-user') {
-      const msg = e.code === 'auth/unauthorized-domain'
-        ? (lang==='he' ? 'הדומיין לא מאושר בפיירבייס — פתח את האפליקציה מ-GitHub Pages' : 'Domain not authorized in Firebase — open app from GitHub Pages')
-        : (lang==='he' ? 'שגיאה בהתחברות: ' + e.message : 'Sign-in error: ' + e.message);
-      showToast(msg, 'error');
-      console.error('Auth error:', e);
-    }
-  }
-}
-
-// Push encrypted data to Firebase
-async function pushToCloud() {
-  if (!firebaseUser || !cryptoKey) return;
-  try {
-    const data = { tx: transactions, budgets, learnedCats };
-    const encrypted = await encryptData(data, cryptoKey);
-    const payload = {
-      data: JSON.stringify(encrypted),
-      ts: firebase.database.ServerValue.TIMESTAMP,
-      device: navigator.userAgent.substring(0, 60)
-    };
-    await firebase.database().ref('users/' + firebaseUser.uid + '/expenses').set(payload);
-  } catch(e) {
-    console.warn('Cloud push failed:', e);
-  }
-}
-
-// Pull encrypted data from Firebase and merge if newer
-async function pullFromCloud() {
-  if (!firebaseUser || !cryptoKey) return false;
-  try {
-    const snap = await firebase.database().ref('users/' + firebaseUser.uid + '/expenses').once('value');
-    const val = snap.val();
-    if (!val || !val.data) return false;
-    const encrypted = JSON.parse(val.data);
-    const cloudData = await decryptData(encrypted, cryptoKey);
-    if (!cloudData) {
-      // Wrong PIN for cloud data — skip silently
-      return false;
-    }
-    const cloudTx = cloudData.tx || [];
-    if (cloudTx.length === 0 && transactions.length > 0) return false;
-
-    // Merge: union by dedupKey or ref
-    const localKeys = new Set(transactions.map(t => t.dedupKey || t.ref || `${t.date}_${t.merchant}_${t.amount}`));
-    let merged = [...transactions];
-    let added = 0;
-    for (const ct of cloudTx) {
-      const key = ct.dedupKey || ct.ref || `${ct.date}_${ct.merchant}_${ct.amount}`;
-      if (!localKeys.has(key)) {
-        merged.push(ct);
-        localKeys.add(key);
-        added++;
-      }
-    }
-    // Merge budgets (cloud wins for conflicts)
-    const mergedBudgets = { ...budgets, ...cloudData.budgets };
-    // Merge learned categories (cloud wins)
-    const mergedLearned = { ...learnedCats, ...cloudData.learnedCats };
-
-    if (added > 0 || Object.keys(cloudData.budgets||{}).length > Object.keys(budgets).length) {
-      transactions = merged;
-      budgets = mergedBudgets;
-      learnedCats = mergedLearned;
-      await saveData();
-      refreshAll();
-      if (added > 0) {
-        showToast(lang==='he' ? `☁️ ${added} עסקאות סונכרנו מהענן` : `☁️ ${added} transactions synced from cloud`, 'success');
-      }
-      return true;
-    }
-    // Even if no new tx, update budgets/learned if different
-    budgets = mergedBudgets;
-    learnedCats = mergedLearned;
-    return false;
-  } catch(e) {
-    console.warn('Cloud pull failed:', e);
-    return false;
-  }
-}
-
-// Listen for auth state changes
-firebase.auth().onAuthStateChanged(async (user) => {
-  firebaseUser = user;
-  syncEnabled = !!user;
-  updateSyncUI();
-  if (user && cryptoKey) {
-    // Pull cloud data on sign-in
-    await pullFromCloud();
-    // Push local data to cloud (ensures cloud has latest)
-    await pushToCloud();
-  }
-});
-
-// ===== SERVICE WORKER =====
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(() => {});
-}
-</script>
-</body>
-</html>
+  
