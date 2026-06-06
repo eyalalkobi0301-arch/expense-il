@@ -1,0 +1,2435 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ExpenseIL — מעקב הוצאות</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#6366f1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ExpenseIL">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" integrity="sha384-bs/nf9FbdNouRbMiFcrcZfLXYPKiPaGVGplVbv7dLGECccEXDW+S3zjqSKR5ZEaD" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" integrity="sha384-D/t0ZMqQW31H3az8ktEiNb39wyKnS82iFY52QPACM+IjKW3jDUhyIgh2PApRqJZs" crossorigin="anonymous"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #242836;
+  --border: #2e3347;
+  --text: #e4e4e7;
+  --text2: #b0b7c3;
+  --accent: #6366f1;
+  --accent2: #818cf8;
+  --green: #34d399;
+  --red: #f87171;
+  --orange: #fbbf24;
+  --blue: #60a5fa;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg); color: var(--text); min-height: 100vh; direction: rtl;
+}
+.app { max-width: 1400px; margin: 0 auto; padding: 20px; }
+.header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 24px;
+}
+.header h1 { font-size: 1.8em; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.lang-toggle, .btn-lock {
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+  padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 0.9em;
+}
+.lang-toggle:hover, .btn-lock:hover { border-color: var(--accent); }
+.tabs {
+  display: flex; gap: 8px; margin-bottom: 24px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; flex-wrap: nowrap;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  padding: 10px 20px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; cursor: pointer; color: var(--text2); transition: all 0.2s;
+  font-size: 0.95em; white-space: nowrap; min-height: 44px;
+  display: flex; align-items: center;
+}
+.tab:hover { border-color: var(--accent); color: var(--text); }
+.tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 24px; margin-bottom: 20px;
+}
+.card h2 { font-size: 1.2em; margin-bottom: 16px; color: var(--text); }
+.card h3 { font-size: 1em; margin-bottom: 12px; color: var(--text2); }
+.stats-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px; margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 20px; text-align: center;
+}
+.stat-card .label { font-size: 0.85em; color: var(--text2); margin-bottom: 8px; }
+.stat-card .value { font-size: 1.8em; font-weight: 700; }
+.stat-card .value.expense { color: var(--red); }
+.stat-card .value.budget { color: var(--green); }
+.stat-card .value.neutral { color: var(--blue); }
+.upload-area {
+  border: 2px dashed var(--border); border-radius: 16px;
+  padding: 36px; text-align: center; cursor: pointer;
+  transition: all 0.3s; margin-bottom: 20px;
+}
+.upload-area:hover, .upload-area.dragover {
+  border-color: var(--accent); background: rgba(99,102,241,0.05);
+}
+.upload-area .icon { font-size: 2.5em; margin-bottom: 12px; }
+.upload-area p { color: var(--text2); margin: 4px 0; }
+.upload-area .supported { font-size: 0.8em; color: var(--text2); opacity: 0.7; }
+input[type="file"] { display: none; }
+.table-container { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+thead th {
+  background: var(--surface2); padding: 12px 16px; text-align: right;
+  border-bottom: 2px solid var(--border); font-weight: 600; white-space: nowrap;
+  position: sticky; top: 0;
+}
+tbody td { padding: 10px 16px; border-bottom: 1px solid var(--border); }
+tbody tr:hover { background: var(--surface2); }
+.amount-cell { font-weight: 600; direction: ltr; text-align: left; }
+.amount-negative { color: var(--red); }
+.amount-credit { color: #16a34a; font-weight: 600; }
+.category-badge {
+  display: inline-block; padding: 3px 10px; border-radius: 20px;
+  font-size: 0.8em; background: var(--surface2); border: 1px solid var(--border);
+}
+.source-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 6px;
+  font-size: 0.75em; font-weight: 600;
+}
+.source-isracard { background: rgba(99,102,241,0.2); color: var(--accent2); }
+.source-max { background: rgba(251,191,36,0.2); color: var(--orange); }
+.source-cal { background: rgba(52,211,153,0.2); color: var(--green); }
+.filters {
+  display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center;
+}
+.filter-select, .filter-input {
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+  padding: 8px 14px; border-radius: 8px; font-size: 0.9em;
+}
+.filter-select:focus, .filter-input:focus { border-color: var(--accent); outline: none; }
+.budget-row {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+  padding: 12px; background: var(--surface2); border-radius: 10px; flex-wrap: wrap;
+}
+.budget-row .cat-name { min-width: 120px; font-weight: 500; }
+.budget-row input {
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  padding: 6px 12px; border-radius: 6px; width: 120px; text-align: center;
+}
+.budget-bar-container { flex: 1; min-width: 100px; height: 24px; background: var(--bg); border-radius: 12px; overflow: hidden; position: relative; }
+.budget-bar { height: 100%; border-radius: 12px; transition: width 0.5s; }
+.budget-bar.ok { background: linear-gradient(90deg, var(--green), #059669); }
+.budget-bar.warn { background: linear-gradient(90deg, var(--orange), #f59e0b); }
+.budget-bar.over { background: linear-gradient(90deg, var(--red), #dc2626); }
+.budget-pct { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); font-size: 0.75em; font-weight: 600; }
+.delta-table-wrap { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 20px; margin-bottom:20px; overflow-x:auto; }
+.delta-table-wrap h3 { margin:0 0 10px; font-size:1em; }
+.delta-table { width:100%; border-collapse:collapse; font-size:0.88em; }
+.delta-table th { text-align:start; padding:6px 10px; font-size:0.85em; color:var(--text2); font-weight:500; border-bottom:1px solid var(--border); white-space:nowrap; }
+.delta-table td { padding:7px 10px; border-bottom:1px solid var(--border); white-space:nowrap; }
+.delta-table tr:last-child td { border-bottom:none; font-weight:700; }
+.delta-up { color:#ef4444; }
+.delta-down { color:#16a34a; }
+.delta-neutral { color:var(--text2); }
+.charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.chart-box { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+.chart-box h3 { margin-bottom: 12px; }
+.chart-box canvas { max-height: 300px; }
+.btn {
+  padding: 10px 20px; border-radius: 10px; border: none;
+  font-size: 0.9em; cursor: pointer; font-weight: 600; transition: all 0.2s;
+}
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { background: var(--accent2); }
+.btn-danger { background: rgba(248,113,113,0.15); color: var(--red); border: 1px solid rgba(248,113,113,0.3); }
+.btn-danger:hover { background: rgba(248,113,113,0.25); }
+.btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  z-index: 1000; justify-content: center; align-items: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  padding: 32px; max-width: 500px; width: 90%;
+}
+.modal h2 { margin-bottom: 16px; }
+.modal input, .modal select {
+  width: 100%; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); padding: 10px 14px; border-radius: 8px; margin-bottom: 12px;
+}
+.modal .btn-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+.security-notice {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(52,211,153,0.08); border: 1px solid rgba(52,211,153,0.2);
+  border-radius: 10px; padding: 12px 16px; margin-bottom: 20px;
+  font-size: 0.85em; color: var(--green);
+}
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text2); }
+.empty-state .icon { font-size: 4em; margin-bottom: 16px; opacity: 0.5; }
+.welcome-cta {
+  text-align: center; padding: 60px 20px;
+}
+.welcome-cta .icon { font-size: 4em; margin-bottom: 16px; }
+.welcome-cta h2 { margin-bottom: 12px; }
+.welcome-cta p { color: var(--text2); margin-bottom: 24px; max-width: 500px; margin-left: auto; margin-right: auto; }
+.toast-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 2000; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.toast {
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+  padding: 12px 24px; border-radius: 12px; font-size: 0.9em;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4); animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s;
+  max-width: 90vw;
+}
+.toast.success { border-color: rgba(52,211,153,0.5); }
+.toast.error { border-color: rgba(248,113,113,0.5); }
+.toast.warn { border-color: rgba(251,191,36,0.5); }
+@keyframes toastIn { from { opacity:0; transform:translateY(-20px); } to { opacity:1; transform:translateY(0); } }
+@keyframes toastOut { from { opacity:1; } to { opacity:0; transform:translateY(-20px); } }
+.pin-screen {
+  position: fixed; inset: 0; background: var(--bg); z-index: 3000;
+  display: flex; justify-content: center; align-items: center;
+}
+.pin-box {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+  padding: 40px; text-align: center; max-width: 400px; width: 90%;
+}
+.pin-box h2 { margin-bottom: 8px; }
+.pin-box p { color: var(--text2); margin-bottom: 24px; font-size: 0.9em; }
+.pin-box input {
+  width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  padding: 14px; border-radius: 10px; font-size: 1.2em; text-align: center;
+  letter-spacing: 8px; margin-bottom: 16px;
+}
+.pin-box input:focus { border-color: var(--accent); outline: none; }
+.pin-box .btn { width: 100%; margin-bottom: 8px; }
+.pin-error { color: var(--red); font-size: 0.85em; margin-bottom: 12px; min-height: 20px; }
+.recurring-item {
+  display: flex; align-items: center; gap: 12px; padding: 14px;
+  background: var(--surface2); border-radius: 10px; margin-bottom: 10px;
+}
+.recurring-item .r-icon { font-size: 1.5em; }
+.recurring-item .r-info { flex: 1; }
+.recurring-item .r-name { font-weight: 600; }
+.recurring-item .r-detail { font-size: 0.85em; color: var(--text2); }
+.recurring-item .r-amount { font-weight: 700; color: var(--red); font-size: 1.1em; direction: ltr; }
+.forecast-box {
+  background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.2);
+  border-radius: 12px; padding: 16px; margin-bottom: 20px; text-align: center;
+}
+.forecast-box .f-label { color: var(--text2); font-size: 0.85em; margin-bottom: 4px; }
+.forecast-box .f-value { font-size: 1.5em; font-weight: 700; color: var(--accent2); }
+.col-card { display: none; }
+@media (max-width: 768px) {
+  .charts-grid { grid-template-columns: 1fr; }
+  .stats-row { grid-template-columns: 1fr 1fr; }
+  .header h1 { font-size: 1.3em; }
+  .filters { flex-direction: column; }
+  .upload-area { padding: 24px; }
+  .col-card { display: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<div class="pin-screen" id="pinScreen" style="display:none;">
+  <div class="pin-box">
+    <div style="font-size:2.5em;margin-bottom:16px;">🔐</div>
+    <h2 id="pinTitle">הגדר קוד PIN</h2>
+    <p id="pinSubtitle">הקוד ישמור על הנתונים שלך מפני גישה לא מורשית</p>
+    <input type="password" id="pinInput" maxlength="6" placeholder="••••" inputmode="numeric" pattern="[0-9]*">
+    <div class="pin-error" id="pinError"></div>
+    <button class="btn btn-primary" id="pinBtn" onclick="handlePin()">אישור</button>
+    <button class="btn btn-secondary" id="pinSkip" onclick="skipPin()" style="margin-top:8px;">דלג</button>
+  </div>
+</div>
+
+<div class="app" id="mainApp">
+  <div class="header">
+    <h1>ExpenseIL</h1>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <button class="btn" id="syncBtn" onclick="handleSyncClick()" title="סנכרון" style="display:none;font-size:0.85em;padding:6px 12px;">☁️ <span id="syncLabel">סנכרון</span></button>
+      <button class="btn-lock" onclick="lockApp()" id="lockBtn" title="נעילה" style="display:none;">🔒</button>
+      <button class="lang-toggle" onclick="toggleLang()">EN / עב</button>
+    </div>
+  </div>
+
+  <div class="security-notice">
+    <span>🔒</span>
+    <span id="securityText">כל הנתונים מוצפנים ונשמרים אך ורק על המכשיר שלך. שום מידע לא נשלח לשרת חיצוני.</span>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="dashboard" onclick="switchTab('dashboard')"><span class="t" data-he="דשבורד" data-en="Dashboard">דשבורד</span></div>
+    <div class="tab" data-tab="transactions" onclick="switchTab('transactions')"><span class="t" data-he="עסקאות" data-en="Transactions">עסקאות</span></div>
+    <div class="tab" data-tab="budget" onclick="switchTab('budget')"><span class="t" data-he="תקציב" data-en="Budget">תקציב</span></div>
+    <div class="tab" data-tab="recurring" onclick="switchTab('recurring')"><span class="t" data-he="הוצאות קבועות" data-en="Recurring">הוצאות קבועות</span></div>
+    <div class="tab" data-tab="compare" onclick="switchTab('compare')"><span class="t" data-he="השוואה" data-en="Compare">השוואה</span></div>
+    <div class="tab" data-tab="import" onclick="switchTab('import')"><span class="t" data-he="ייבוא" data-en="Import">ייבוא</span></div>
+  </div>
+
+  <div class="tab-content" id="tab-dashboard">
+    <div id="dashboardWelcome" style="display:none;">
+      <div class="welcome-cta">
+        <div class="icon">📊</div>
+        <h2 class="t" data-he="ברוך הבא ל-ExpenseIL!" data-en="Welcome to ExpenseIL!">ברוך הבא ל-ExpenseIL!</h2>
+        <p class="t" data-he="כדי להתחיל, ייבא קובץ CSV מחברת האשראי שלך או טען נתוני דוגמה" data-en="To get started, import a CSV file from your credit card company or load sample data">כדי להתחיל, ייבא קובץ CSV מחברת האשראי שלך או טען נתוני דוגמה</p>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="switchTab('import')">📂 <span class="t" data-he="ייבא קובץ" data-en="Import File">ייבא קובץ</span></button>
+          <button class="btn btn-secondary" onclick="switchTab('import');setTimeout(loadSampleData,300);">📊 <span class="t" data-he="נתוני דוגמה" data-en="Sample Data">נתוני דוגמה</span></button>
+        </div>
+      </div>
+    </div>
+    <div id="dashboardContent">
+      <div id="dashMonthNav" style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px;">
+        <button class="btn btn-secondary" onclick="changeDashMonth(-1)" style="padding:6px 14px;font-size:1.1em;">◀</button>
+        <span id="dashMonthLabel" style="font-size:1.15em;font-weight:600;min-width:140px;text-align:center;"></span>
+        <button class="btn btn-secondary" onclick="changeDashMonth(1)" style="padding:6px 14px;font-size:1.1em;">▶</button>
+      </div>
+      <div class="stats-row" id="statsRow"></div>
+      <div id="forecastBox"></div>
+      <div id="budgetAlerts"></div>
+      <div id="deltaTable"></div>
+      <div class="charts-grid">
+        <div class="chart-box">
+          <h3 class="t" data-he="הוצאות לפי קטגוריה" data-en="Expenses by Category">הוצאות לפי קטגוריה</h3>
+          <canvas id="chartCategory"></canvas>
+          <div id="chartCategoryEmpty" class="empty-state" style="display:none;padding:30px;"><p class="t" data-he="אין נתונים" data-en="No data">אין נתונים</p></div>
+        </div>
+        <div class="chart-box">
+          <h3 class="t" data-he="הוצאות חודשיות" data-en="Monthly Expenses">הוצאות חודשיות</h3>
+          <canvas id="chartMonthly"></canvas>
+          <div id="chartMonthlyEmpty" class="empty-state" style="display:none;padding:30px;"><p class="t" data-he="אין נתונים" data-en="No data">אין נתונים</p></div>
+        </div>
+        <div class="chart-box">
+          <h3 class="t" data-he="הוצאות לפי כרטיס" data-en="Expenses by Card">הוצאות לפי כרטיס</h3>
+          <canvas id="chartCard"></canvas>
+          <div id="chartCardEmpty" class="empty-state" style="display:none;padding:30px;"><p class="t" data-he="אין נתונים" data-en="No data">אין נתונים</p></div>
+        </div>
+        <div class="chart-box">
+          <h3 class="t" data-he="מגמה יומית (חודש נוכחי)" data-en="Daily Trend (Current Month)">מגמה יומית (חודש נוכחי)</h3>
+          <canvas id="chartDaily"></canvas>
+          <div id="chartDailyEmpty" class="empty-state" style="display:none;padding:30px;"><p class="t" data-he="אין נתונים" data-en="No data">אין נתונים</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-transactions" style="display:none;">
+    <div class="filters">
+      <input class="filter-input" type="text" id="filterSearch" oninput="renderTransactions()" style="min-width:200px;">
+      <select class="filter-select" id="filterMonth" onchange="renderTransactions()"></select>
+      <select class="filter-select" id="filterCategory" onchange="renderTransactions()"></select>
+      <select class="filter-select" id="filterSource" onchange="renderTransactions()">
+        <option value="">—</option>
+        <option value="isracard">ישראכרט</option>
+        <option value="max">מקס</option>
+        <option value="cal">כאל</option>
+      </select>
+      <div style="flex:1;"></div>
+      <button class="btn btn-secondary" onclick="exportCSV()">📥 Export CSV</button>
+    </div>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th class="t" data-he="תאריך" data-en="Date">תאריך</th>
+            <th class="t" data-he="בית עסק" data-en="Merchant">בית עסק</th>
+            <th class="t" data-he="סכום" data-en="Amount">סכום</th>
+            <th class="t" data-he="קטגוריה" data-en="Category">קטגוריה</th>
+            <th class="t col-card" data-he="כרטיס" data-en="Card">כרטיס</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="txBody"></tbody>
+      </table>
+    </div>
+    <div class="empty-state" id="txEmpty" style="display:none;">
+      <div class="icon">📋</div>
+      <p class="t" data-he="אין עסקאות. ייבא קובץ כדי להתחיל!" data-en="No transactions. Import a file to get started!">אין עסקאות. ייבא קובץ כדי להתחיל!</p>
+    </div>
+    <details style="margin-top:20px;">
+      <summary class="btn btn-secondary" style="cursor:pointer;display:inline-block;">🏷️ <span class="t" data-he="כללי סיווג נלמדים" data-en="Learned Rules">כללי סיווג נלמדים</span> (<span id="learnedCount">0</span>)</summary>
+      <div class="card" style="margin-top:10px;" id="learnedRulesContent"></div>
+    </details>
+  </div>
+
+  <div class="tab-content" id="tab-budget" style="display:none;">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+        <h2 class="t" data-he="תקציב חודשי" data-en="Monthly Budget">תקציב חודשי</h2>
+        <select class="filter-select" id="budgetMonth" onchange="renderBudget()"></select>
+      </div>
+      <div id="budgetContent"></div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-recurring" style="display:none;">
+    <div class="card">
+      <h2 class="t" data-he="הוצאות קבועות חודשיות" data-en="Monthly Recurring Expenses">הוצאות קבועות חודשיות</h2>
+      <p style="color:var(--text2);margin-bottom:20px;font-size:0.9em;" class="t"
+         data-he="עסקאות שחוזרות מדי חודש עם אותו ספק וסכום דומה"
+         data-en="Transactions that repeat monthly with the same merchant and similar amount">עסקאות שחוזרות מדי חודש עם אותו ספק וסכום דומה</p>
+      <div id="recurringTotal" style="margin-bottom:16px;"></div>
+      <div id="recurringList"></div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-compare" style="display:none;">
+    <div class="card">
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap;">
+        <h2 class="t" data-he="השוואה בין חודשים" data-en="Month Comparison">השוואה בין חודשים</h2>
+        <select class="filter-select" id="compareMonth1" onchange="renderCompare()"></select>
+        <span>&#8644;</span>
+        <select class="filter-select" id="compareMonth2" onchange="renderCompare()"></select>
+      </div>
+      <canvas id="chartCompare" style="max-height:400px;"></canvas>
+      <div id="compareDetails" style="margin-top:20px;"></div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="tab-import" style="display:none;">
+    <div class="card">
+      <h2 class="t" data-he="ייבוא קבצים" data-en="Import Files">ייבוא קבצים</h2>
+      <p style="color:var(--text2);margin-bottom:20px;" class="t"
+         data-he="הורד קובץ XLSX/CSV מאתר חברת האשראי וגרור לכאן"
+         data-en="Download an XLSX/CSV file from your credit card website and drag it here">הורד קובץ XLSX/CSV מאתר חברת האשראי וגרור לכאן</p>
+      <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click();">
+        <div class="icon">📂</div>
+        <p class="t" data-he="גרור קובץ לכאן או לחץ לבחירה" data-en="Drag a file here or click to select">גרור קובץ לכאן או לחץ לבחירה</p>
+        <p class="supported">XLSX, CSV, TSV — Isracard, Max, Cal</p>
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.tsv" multiple onchange="handleFiles(this.files)">
+      </div>
+      <div id="watchFolderSection" style="margin-top:12px;text-align:center;">
+        <button onclick="pickWatchFolder()" class="btn" style="background:var(--accent2);color:#fff;padding:8px 18px;border-radius:8px;cursor:pointer;border:none;font-size:0.9em;">
+          📁 <span class="t" data-he="בחר תיקיית אקסלים" data-en="Pick Excel Folder">בחר תיקיית אקסלים</span>
+        </button>
+        <span id="watchFolderName" style="margin-right:8px;color:var(--text2);font-size:0.85em;"></span>
+        <button id="scanFolderBtn" onclick="scanWatchFolder()" class="btn" style="display:none;background:var(--accent);color:#fff;padding:6px 14px;border-radius:8px;cursor:pointer;border:none;font-size:0.85em;margin-top:6px;">
+          🔍 <span class="t" data-he="סרוק קבצים חדשים" data-en="Scan for new files">סרוק קבצים חדשים</span>
+        </button>
+      </div>
+      <div id="watchFolderResults" style="margin-top:8px;"></div>
+
+      <div class="card" style="margin-top:16px;">
+        <h3 class="t" data-he="הוספת עסקה ידנית" data-en="Add Manual Transaction">הוספת עסקה ידנית</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:12px;">
+          <input type="date" id="manualDate" class="filter-input">
+          <input type="text" id="manualMerchant" class="filter-input" placeholder="בית עסק / Merchant">
+          <input type="number" id="manualAmount" class="filter-input" placeholder="סכום / Amount" step="0.01">
+          <select id="manualCategory" class="filter-select"></select>
+          <button class="btn btn-primary" onclick="addManual()">+</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;" id="watchedFolderCard">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <h3 style="display:flex;align-items:center;gap:8px;">
+            <span>☕</span>
+            <span class="t" data-he="מצב בוקר — תיקייה נצפית" data-en="Coffee Morning Mode — Watched Folder">מצב בוקר — תיקייה נצפית</span>
+          </h3>
+          <div style="display:flex;gap:8px;" id="watchedFolderButtons">
+            <button class="btn btn-primary" onclick="pickWatchedFolder()" id="btnPickFolder">
+              <span class="t" data-he="בחר תיקייה" data-en="Pick Folder">בחר תיקייה</span>
+            </button>
+            <button class="btn btn-secondary" onclick="scanWatchedFolder()" id="btnScanFolder" style="display:none;">
+              <span class="t" data-he="סרוק עכשיו" data-en="Scan Now">סרוק עכשיו</span>
+            </button>
+            <button class="btn btn-secondary" onclick="clearWatchedFolder()" id="btnClearFolder" style="display:none;" title="נתק תיקייה">✕</button>
+          </div>
+        </div>
+        <p style="color:var(--text2);font-size:0.85em;margin-bottom:8px;" class="t"
+           data-he="בחר תיקייה שבה אתה שומר קבצי XLSX/CSV מחברות האשראי. הקבצים ייובאו אוטומטית."
+           data-en="Pick a folder where you save CC XLSX/CSV files. They'll be imported automatically.">בחר תיקייה שבה אתה שומר קבצי XLSX/CSV מחברות האשראי. הקבצים ייובאו אוטומטית.</p>
+        <div id="watchedFolderStatus" style="font-size:0.85em;color:var(--text2);"></div>
+        <div id="watchedFolderLog" style="max-height:150px;overflow-y:auto;font-size:0.85em;margin-top:8px;"></div>
+        <div id="watchedFolderUnsupported" style="display:none;color:var(--orange);font-size:0.85em;margin-top:4px;">
+          <span class="t" data-he="⚠️ דפדפן זה לא תומך ב-File System Access API. השתמש ב-Chrome/Edge." data-en="⚠️ This browser does not support the File System Access API. Use Chrome/Edge.">⚠️ דפדפן זה לא תומך ב-File System Access API. השתמש ב-Chrome/Edge.</span>
+        </div>
+      </div>
+
+      <div id="importLogContainer" style="display:none;margin-top:16px;" class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <h3 class="t" data-he="יומן ייבוא" data-en="Import Log">יומן ייבוא</h3>
+          <button class="btn btn-secondary" style="padding:4px 12px;font-size:0.8em;" onclick="clearImportLog()">✕</button>
+        </div>
+        <div id="importLogEntries" style="max-height:200px;overflow-y:auto;font-size:0.85em;"></div>
+      </div>
+
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-secondary" onclick="loadSampleData()">📊 <span class="t" data-he="נתוני דוגמה" data-en="Sample Data">נתוני דוגמה</span></button>
+        <button class="btn btn-secondary" onclick="exportBackup()">💾 <span class="t" data-he="גיבוי" data-en="Backup">גיבוי</span></button>
+        <button class="btn btn-secondary" onclick="document.getElementById('backupInput').click()">📥 <span class="t" data-he="שחזור" data-en="Restore">שחזור</span></button>
+        <input type="file" id="backupInput" accept=".json" style="display:none" onchange="importBackup(this.files[0])">
+        <div style="flex:1;"></div>
+        <button class="btn btn-danger" onclick="clearAllData()">🗑️ <span class="t" data-he="מחק הכל" data-en="Clear All">מחק הכל</span></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="catModal">
+  <div class="modal">
+    <h2 class="t" data-he="שנה קטגוריה" data-en="Change Category">שנה קטגוריה</h2>
+    <select id="catModalSelect"></select>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="closeCatModal()">ביטול</button>
+      <button class="btn btn-primary" onclick="saveCatModal()">שמור</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== XSS PROTECTION (Fix #1) =====
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ===== TOAST SYSTEM (Fix #10) =====
+function showToast(msg, type='success') {
+  const c = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ===== STATE =====
+let transactions = [];
+let budgets = {};
+let lang = localStorage.getItem('expenseIL_lang') || 'he';
+let editingTxIdx = -1;
+let isEncrypted = !!localStorage.getItem('expenseIL_encrypted');
+let cryptoKey = null;
+let learnedCats = {};
+
+// ===== PIN & ENCRYPTION (Fix #4) =====
+async function deriveKey(pin, salt) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(pin), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+    keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptData(data, key) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const enc = new TextEncoder();
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(JSON.stringify(data)));
+  return { iv: Array.from(iv), ct: Array.from(new Uint8Array(ct)) };
+}
+
+async function decryptData(encrypted, key) {
+  try {
+    const iv = new Uint8Array(encrypted.iv);
+    const ct = new Uint8Array(encrypted.ct);
+    const dec = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+    return JSON.parse(new TextDecoder().decode(dec));
+  } catch { return null; }
+}
+
+async function saveData() {
+  // Check localStorage quota before writing
+  try {
+    localStorage.setItem('expenseIL_lang', lang);
+  } catch(e) {
+    showToast(lang==='he' ? 'אזהרה: אחסון מלא! הנתונים עלולים לא להישמר.' : 'Warning: Storage full! Data may not be saved.', 'error');
+    return;
+  }
+  if (cryptoKey) {
+    const data = { tx: transactions, budgets, learnedCats };
+    const encrypted = await encryptData(data, cryptoKey);
+    try {
+      localStorage.setItem('expenseIL_encrypted', JSON.stringify(encrypted));
+    } catch(e) {
+      showToast(lang==='he' ? 'אזהרה: אחסון מלא! הנתונים עלולים לא להישמר.' : 'Warning: Storage full! Data may not be saved.', 'error');
+      return;
+    }
+    localStorage.removeItem('expenseIL_tx');
+    localStorage.removeItem('expenseIL_budgets');
+    localStorage.removeItem('expIL_learnedCats');
+  } else {
+    localStorage.setItem('expenseIL_tx', JSON.stringify(transactions));
+    localStorage.setItem('expenseIL_budgets', JSON.stringify(budgets));
+    localStorage.setItem('expIL_learnedCats', JSON.stringify(learnedCats));
+  }
+  // Push to cloud if signed in
+  if (syncEnabled && firebaseUser && cryptoKey) {
+    pushToCloud().catch(() => {});
+  }
+}
+
+async function loadData() {
+  const encStr = localStorage.getItem('expenseIL_encrypted');
+  if (encStr && cryptoKey) {
+    const encrypted = JSON.parse(encStr);
+    const data = await decryptData(encrypted, cryptoKey);
+    if (data) {
+      transactions = data.tx || [];
+      budgets = data.budgets || {};
+      learnedCats = data.learnedCats || {};
+      return true;
+    }
+    return false;
+  }
+  transactions = JSON.parse(localStorage.getItem('expenseIL_tx') || '[]');
+  budgets = JSON.parse(localStorage.getItem('expenseIL_budgets') || '{}');
+  learnedCats = JSON.parse(localStorage.getItem('expIL_learnedCats') || '{}');
+  return true;
+}
+
+function showPinScreen(mode) {
+  document.getElementById('pinScreen').style.display = 'flex';
+  document.getElementById('mainApp').style.display = 'none';
+  const isSetup = mode === 'setup';
+  const isUnlock = mode === 'unlock';
+  document.getElementById('pinTitle').textContent = isSetup
+    ? (lang==='he' ? 'הגדר קוד PIN' : 'Set PIN Code')
+    : (lang==='he' ? 'הזן קוד PIN' : 'Enter PIN');
+  document.getElementById('pinSubtitle').textContent = isSetup
+    ? (lang==='he' ? 'הקוד ישמור על הנתונים שלך מפני גישה לא מורשית' : 'This code will protect your data from unauthorized access')
+    : (lang==='he' ? 'הזן את הקוד כדי לגשת לנתונים' : 'Enter your code to access data');
+  document.getElementById('pinSkip').style.display = isSetup ? 'block' : 'none';
+  document.getElementById('pinBtn').textContent = isSetup ? (lang==='he'?'הגדר':'Set') : (lang==='he'?'כנס':'Enter');
+  document.getElementById('pinInput').value = '';
+  document.getElementById('pinError').textContent = '';
+  document.getElementById('pinInput').dataset.mode = mode;
+  document.getElementById('pinInput').focus();
+}
+
+async function handlePin() {
+  const input = document.getElementById('pinInput');
+  const pin = input.value.trim();
+  if (pin.length < 4) {
+    document.getElementById('pinError').textContent = lang==='he' ? 'מינימום 4 תווים' : 'Minimum 4 characters';
+    return;
+  }
+  const mode = input.dataset.mode;
+  if (mode === 'setup') {
+    // Warn user about unrecoverable PIN
+    if (!confirm(lang==='he'
+      ? '⚠️ שים לב: PIN שנשכח = נתונים שאינם ניתנים לשחזור.\nאין אפשרות לאפס את הקוד. האם להמשיך?'
+      : '⚠️ Warning: A forgotten PIN means unrecoverable data loss.\nThere is no way to reset the code. Continue?')) {
+      return;
+    }
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    localStorage.setItem('expenseIL_salt', JSON.stringify(Array.from(salt)));
+    cryptoKey = await deriveKey(pin, salt);
+    isEncrypted = true;
+    // Migrate existing plaintext data into encrypted blob
+    const oldTx = JSON.parse(localStorage.getItem('expenseIL_tx') || '[]');
+    const oldBudgets = JSON.parse(localStorage.getItem('expenseIL_budgets') || '{}');
+    const oldLearned = JSON.parse(localStorage.getItem('expIL_learnedCats') || '{}');
+    transactions = oldTx;
+    budgets = oldBudgets;
+    learnedCats = oldLearned;
+    await saveData();
+    // Clean up old plaintext keys
+    localStorage.removeItem('expIL_learnedCats');
+    localStorage.removeItem('expenseIL_pinHash'); // remove legacy hash if exists
+    enterApp();
+    showToast(lang==='he' ? 'PIN הוגדר בהצלחה! הנתונים מוצפנים.' : 'PIN set! Data is now encrypted.');
+  } else {
+    // Unlock: attempt decryption — if valid JSON, PIN is correct
+    const salt = new Uint8Array(JSON.parse(localStorage.getItem('expenseIL_salt') || '[]'));
+    cryptoKey = await deriveKey(pin, salt);
+    const ok = await loadData();
+    if (!ok) {
+      document.getElementById('pinError').textContent = lang==='he' ? 'קוד שגוי' : 'Wrong code';
+      cryptoKey = null;
+      input.value = '';
+      return;
+    }
+    enterApp();
+  }
+}
+
+function skipPin() {
+  loadData().then(() => enterApp());
+}
+
+function lockApp() {
+  if (isEncrypted) {
+    cryptoKey = null;
+    document.getElementById('mainApp').style.display = 'none';
+    showPinScreen('unlock');
+  }
+}
+
+function enterApp() {
+  document.getElementById('pinScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+  document.getElementById('lockBtn').style.display = isEncrypted ? 'block' : 'none';
+  updateSyncUI();
+  applyLang();
+  populateFilters();
+  renderDashboard();
+  checkDay25Reminder();
+  checkDataFreshness();
+}
+
+// ===== DAY-25 UPLOAD REMINDER =====
+function checkDay25Reminder() {
+  const today = new Date();
+  if (today.getDate() < 25) return;
+  const curMonth = today.toISOString().substring(0,7);
+  const hasCurrent = transactions.some(tx => tx.date?.startsWith(curMonth));
+  if (hasCurrent) return;
+  // Only remind once per month
+  const remKey = 'expenseIL_remind_' + curMonth;
+  if (localStorage.getItem(remKey)) return;
+  localStorage.setItem(remKey, '1');
+  // Try browser notification
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification('ExpenseIL', { body: lang==='he'?'הגיע הזמן לייבא את דוח האשראי החודשי!':'Time to import your monthly credit card statement!', icon: 'icon-192.png' });
+  } else if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission().then(p => {
+      if (p === 'granted') new Notification('ExpenseIL', { body: lang==='he'?'הגיע הזמן לייבא את דוח האשראי החודשי!':'Time to import your monthly credit card statement!', icon: 'icon-192.png' });
+    });
+  }
+  // Always show in-app toast as fallback
+  showToast(lang==='he'?'📅 תזכורת: עדיין לא יובאו נתונים לחודש הנוכחי':'📅 Reminder: No data imported for current month yet','warn');
+}
+
+// ===== DATA FRESHNESS WARNING =====
+function checkDataFreshness() {
+  if (transactions.length === 0) return;
+  const months = getMonths();
+  if (months.length === 0) return;
+  const latest = months[0]; // most recent month (sorted desc)
+  const now = new Date();
+  const latestDate = new Date(latest + '-01');
+  const diffMs = now - latestDate;
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffDays > 45) {
+    const el = document.getElementById('budgetAlerts');
+    if (el) {
+      const warn = `<div class="alert" style="background:#78350f;border:1px solid #f59e0b;border-radius:10px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+        <span style="font-size:1.3em;">⚠️</span>
+        <span>${lang==='he'?`הנתונים האחרונים הם מ-${latest}. שקול לייבא דוח חדש.`:`Latest data is from ${latest}. Consider importing a new statement.`}</span>
+      </div>`;
+      el.innerHTML = warn + el.innerHTML;
+    }
+  }
+}
+
+// ===== CATEGORIES =====
+const CATEGORIES = {
+  supermarket: { he: 'סופרמרקט', en: 'Supermarket', icon: '🛒', color: '#34d399' },
+  restaurants: { he: 'מסעדות', en: 'Restaurants', icon: '🍕', color: '#f87171' },
+  fuel: { he: 'דלק', en: 'Fuel', icon: '⛽', color: '#fbbf24' },
+  clothing: { he: 'ביגוד', en: 'Clothing', icon: '👕', color: '#a78bfa' },
+  health: { he: 'בריאות', en: 'Health', icon: '💊', color: '#f472b6' },
+  transport: { he: 'תחבורה', en: 'Transport', icon: '🚌', color: '#60a5fa' },
+  entertainment: { he: 'בילויים', en: 'Entertainment', icon: '🎬', color: '#c084fc' },
+  bills: { he: 'חשבונות', en: 'Bills', icon: '📄', color: '#fb923c' },
+  education: { he: 'חינוך', en: 'Education', icon: '📚', color: '#2dd4bf' },
+  online: { he: 'קניות אונליין', en: 'Online Shopping', icon: '🛍️', color: '#818cf8' },
+  insurance: { he: 'ביטוח', en: 'Insurance', icon: '🛡️', color: '#94a3b8' },
+  subscriptions: { he: 'מנויים', en: 'Subscriptions', icon: '🔄', color: '#e879f9' },
+  home: { he: 'בית', en: 'Home', icon: '🏠', color: '#4ade80' },
+  kids: { he: 'ילדים', en: 'Kids', icon: '👶', color: '#fb7185' },
+  transfers: { he: 'העברות', en: 'Transfers', icon: '💸', color: '#38bdf8' },
+  fees: { he: 'עמלות', en: 'Fees', icon: '🏦', color: '#78716c' },
+  other: { he: 'אחר', en: 'Other', icon: '📦', color: '#6b7280' },
+};
+
+// ===== AUTO-CATEGORIZATION (Fix #9 — expanded rules + learning) =====
+const CAT_RULES = [
+  { pattern: /שופרסל|רמי לוי|מגה|יוחננוף|חצי חינם|אושר עד|סופר(?![\s\-]*פארם)|פרש|שוק|מרקט|tiv.?taam|טיב טעם|ויקטורי|יינות ביתן|מחסני השוק|אלונית|סטופ מרקט|קרפור|AM.?PM|ampm|פירות|ירקות|דהן|מכולת|יוניברס|נוחות|מיני.?מרקט|גוד פארם|קופי/i, cat: 'supermarket' },
+  { pattern: /מסעד|פיצ|בורגר|מקדונלד|קפה|caff?e|coffee|restaurant|ארומה|גרג|לנדוור|שיפודי|חומוס|פלאפל|סושי|wolt|japanika|תן ביס|10bis|burger ranch|בורגר ראנץ|שווארמה|דומינו|pizza|KFC|BBB|moses|מוזס|אגאדיר|גוצ'ה|בר יין|בר ויין|ג'סמינו|מנטנטן|לגנדה|דוברין|בראון|סיבוס|cibus|flexi|cucu|טאקו|steak|סטייק|נודלס|noodle|באר|beer|pub|פאב|ביסטרו|bistro|גלידה|טוסט|בייגל|bagel|אספרסו|espresso|ביי בייגל/i, cat: 'restaurants' },
+  { pattern: /דלק|סונול|פז|דור אלון|ten\b|delek|yellow|sonol/i, cat: 'fuel' },
+  { pattern: /H&M|זארה|ZARA|קסטרו|fox\b|רנואר|גולף|אמריקן איגל|pull|מנגו|SHEIN|next\b|terminal|טרמינל|נייקי|nike|adidas|אדידס|URBAN|ליוויס|levi|הודיס|ML\b|בגדי|אופנה|fashion/i, cat: 'clothing' },
+  { pattern: /סופר פארם|בי פארם|מכבי|כללית|לאומית|מאוחדת|pharma|רופא|רפואה|בית חולים|אופטיק|שב"ן|מרכז טיפו|טיפול|פיזיו|שיניים|דנטל|dental|מספרה|ספר\b|תספורת|barber|salon|סלון|יופי|beauty|קוסמטיק|cosmetic|עיניים|משקפ|בן לוגסי/i, cat: 'health' },
+  { pattern: /רכבת|אגד|דן\b|מונית|gett|yango|uber|רב.?קו|taxi|bus|train|פארקינג|parking|חניון|Ride|אוטו|מוסך|garage|רכב|טסט|car.?wash|שטיפת|טיולית/i, cat: 'transport' },
+  { pattern: /סינמ|יס פלאנט|netflix|spotify|סלקום tv|disney|apple tv|הופ|הצגה|תיאטרון|\byes\b|קונצרט|הופעה|מוזיאון|museum|פסטיבל|festival|כרטיסים|ticket|\bHOT\b/i, cat: 'entertainment' },
+  { pattern: /חשמל|מים|ארנונה|גז\b|בזק|פרטנר|סלקום|cellcom|partner|hot mobile|hot net|012|עירייה|מקורות|חברת חשמל/i, cat: 'bills' },
+  { pattern: /amazon|aliexpress|ebay|AMZN|ali express|asos|iherb|אמזון|temu|shein online|wish\b|book depository/i, cat: 'online' },
+  { pattern: /ביטוח|insurance|הראל|מגדל|כלל ביטוח|הפניקס|מנורה|איילון/i, cat: 'insurance' },
+  { pattern: /gym|כושר|הולמס|חוג|קורס|אוניברסיט|מכללה|ספייס|לימוד|סדנה|workshop/i, cat: 'education' },
+  { pattern: /נטפליקס|ספוטיפיי|apple\.com|google play|microsoft|adobe|חודשי|מנוי|subscription|CLAUDE\.AI/i, cat: 'subscriptions' },
+  { pattern: /איקאה|IKEA|הום סנטר|ACE|מרכז בנייה|שיפוץ|ריהוט|home center|הום דיפו|מ\.חשמל|חשמל ביתי/i, cat: 'home' },
+  { pattern: /צעצוע|toys|באבי|ילדים|kids|גן\b|מעון/i, cat: 'kids' },
+  { pattern: /\bbit\b|ביט|paybox|פייבוקס|paypal|pepper pay|פפר/i, cat: 'transfers' },
+  { pattern: /דמי כרטיס|עמלה|commission|ריבית|interest|דמי ניהול|פועלים.*דמי|לאומי.*דמי|הפועלים|דיסקונט.*דמי|מזרחי.*דמי/i, cat: 'fees' },
+];
+
+// Learned merchant→category from manual user edits (stored in encrypted blob)
+function getLearnedCategories() {
+  return learnedCats;
+}
+async function saveLearnedCategory(merchant, cat) {
+  const key = (merchant || '').trim().toLowerCase();
+  if (!key || cat === 'other') return;
+  learnedCats[key] = cat;
+  await saveData();
+}
+
+function autoCategory(merchant) {
+  const m = (merchant || '').trim();
+  if (!m) return 'other';
+  // 1. Check user-learned categories first (exact match, case-insensitive)
+  const learned = getLearnedCategories();
+  const lk = m.toLowerCase();
+  if (learned[lk]) return learned[lk];
+  // 2. Fall back to pattern rules
+  for (const rule of CAT_RULES) {
+    if (rule.pattern.test(m)) return rule.cat;
+  }
+  return 'other';
+}
+
+// ===== CSV COLUMN SCHEMAS (Step 1a — Parser Resilience) =====
+const CSV_SCHEMAS = {
+  isracard: {
+    required: ['תאריך עסקה', 'שם בית עסק', 'סכום חיוב'],
+    optional: ['מספר כרטיס', '4 ספרות', 'מספר אסמכתא', 'סכום עסקה', 'מטבע', 'תאריך חיוב'],
+    identifiers: ['מספר כרטיס', '4 ספרות'],
+    refField: 'מספר אסמכתא'
+  },
+  max: {
+    required: ['תאריך עסקה', 'שם בית העסק', 'סכום חיוב'],
+    optional: ['מספר כרטיס', 'סכום עסקה', 'מטבע מקור', 'ענף', 'מספר אסמכתא', 'הערות'],
+    identifiers: [],
+    refField: 'מספר אסמכתא'
+  },
+  cal: {
+    required: ['תאריך עסקה', 'שם בית עסק', 'סכום חיוב'],
+    optional: ['ת.עסקה', 'הערות', 'מספר שובר', 'מספר כרטיס', 'סכום עסקה', 'מטבע'],
+    identifiers: ['ת.עסקה', 'הערות'],
+    refField: 'מספר שובר'
+  }
+};
+
+function validateColumns(fields, source) {
+  const result = { ok: true, warnings: [], reason: '' };
+  const normalized = fields.map(f => (f || '').trim().toLowerCase());
+
+  if (source === 'unknown') {
+    result.ok = false;
+    result.reason = lang === 'he'
+      ? 'לא זוהתה חברת אשראי. ודא שהקובץ הורד מישראכרט/מקס/כאל.'
+      : 'Credit card company not detected. Make sure file is from Isracard/Max/Cal.';
+    return result;
+  }
+
+  const schema = CSV_SCHEMAS[source];
+  if (!schema) return result;
+
+  // Check required columns exist (fuzzy match)
+  const missing = [];
+  for (const req of schema.required) {
+    const reqLower = req.toLowerCase();
+    const found = normalized.some(f => f.includes(reqLower) || reqLower.includes(f));
+    if (!found) missing.push(req);
+  }
+
+  if (missing.length > 0) {
+    result.ok = false;
+    result.reason = lang === 'he'
+      ? `עמודות חסרות (${source}): ${missing.join(', ')}`
+      : `Missing columns (${source}): ${missing.join(', ')}`;
+    return result;
+  }
+
+  // Warn about unexpected column count
+  const expectedMin = schema.required.length;
+  if (fields.length < expectedMin) {
+    result.warnings.push(lang === 'he'
+      ? `מספר עמודות נמוך מהצפוי (${fields.length} במקום ${expectedMin}+)`
+      : `Column count lower than expected (${fields.length} instead of ${expectedMin}+)`);
+  }
+
+  return result;
+}
+
+// ===== CSV PARSERS =====
+function detectSource(headers) {
+  const h = headers.map(x => (x || '').trim().replace(/\n/g,' ').toLowerCase());
+  const joined = h.join('|');
+  // Isracard XLSX uses "תאריך רכישה" instead of "תאריך עסקה"
+  if (joined.includes('תאריך רכישה') && joined.includes('שם בית עסק')) return 'isracard';
+  if (joined.includes('תאריך עסקה') && (joined.includes('שם בית') || joined.includes('שם בית עסק'))) {
+    if (joined.includes('מספר כרטיס') && joined.includes('4 ספרות')) return 'isracard';
+    if (joined.includes('ת.עסקה') || joined.includes('הערות')) return 'cal';
+    return 'isracard';
+  }
+  if (joined.includes('תאריך עסקה') && joined.includes('שם בית העסק')) return 'max';
+  // Cal XLSX: headers may have newlines stripped to "תאריך עסקה" + "סוג עסקה" + "ענף"
+  if (joined.includes('תאריך עסקה') && joined.includes('ענף') && joined.includes('סוג עסקה')) return 'cal';
+  if (joined.includes('תאריך') && joined.includes('סכום')) {
+    if (joined.includes('לאומי') || joined.includes('max')) return 'max';
+    if (joined.includes('כאל') || joined.includes('cal')) return 'cal';
+    // Cal XLSX fallback: "סוג עסקה" or "ענף" columns
+    if (joined.includes('ענף')) return 'cal';
+  }
+  // Max XLSX: "קטגוריה" + "4 ספרות אחרונות"
+  if (joined.includes('תאריך עסקה') && joined.includes('קטגוריה') && joined.includes('4 ספרות')) return 'max';
+  return 'unknown';
+}
+
+function parseAmount(val) {
+  if (!val) return 0;
+  const s = String(val).replace(/[₪,\s]/g, '').replace(/[^\d.\-]/g, '');
+  return parseFloat(s) || 0;
+}
+
+function parseDate(val) {
+  if (!val) return '';
+  // Handle Excel serial date numbers (SheetJS may return these)
+  if (typeof val === 'number') {
+    try {
+      const dt = XLSX.SSF.parse_date_code(val);
+      if (dt && dt.y) return `${dt.y}-${String(dt.m).padStart(2,'0')}-${String(dt.d).padStart(2,'0')}`;
+    } catch(e) {}
+    return '';
+  }
+  const s = String(val).trim();
+  // ISO datetime "2026-03-23 00:00:00" (Cal XLSX format)
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})\s+\d{2}:\d{2}:\d{2}$/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  // DD/MM/YY or DD-MM-YY or DD.MM.YY (Isracard XLSX: "20.05.26")
+  m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+  if (m) {
+    const y = m[3].length === 2 ? '20' + m[3] : m[3];
+    return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  }
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return s;
+  return s;
+}
+
+// ===== DUPLICATE DETECTION (Fix #2 + Step 1b — reference number) =====
+function txHash(tx) {
+  // If we have a CC reference number, use it for stronger dedup
+  if (tx.ref && tx.ref.trim()) {
+    return `${tx.source}|${tx.ref.trim()}`;
+  }
+  // Fallback: date + merchant + amount
+  return `${tx.date}|${tx.merchant.trim().toLowerCase()}|${tx.amount.toFixed(2)}`;
+}
+
+function deduplicateNew(newTx) {
+  const existingHashes = new Set(transactions.map(txHash));
+  const unique = [];
+  let dupes = 0;
+  let converted = 0;
+  for (const tx of newTx) {
+    const h = txHash(tx);
+    // --- Foreign currency conversion check (BEFORE plain dupe check) ---
+    // When a pending foreign tx gets an ILS amount, the hash (source|ref) is identical,
+    // so we must check for conversion FIRST, otherwise the dupe check swallows it.
+    if (!tx.pendingConversion) {
+      // By ref (strongest match)
+      if (tx.ref) {
+        const pendingMatch = transactions.findIndex(t =>
+          t.pendingConversion && t.ref === tx.ref && t.source === tx.source
+        );
+        if (pendingMatch >= 0) {
+          transactions[pendingMatch].amount = tx.amount;
+          transactions[pendingMatch].pendingConversion = false;
+          transactions[pendingMatch].notes = (transactions[pendingMatch].notes ? transactions[pendingMatch].notes + ' | ' : '') +
+            `הומר מ-${transactions[pendingMatch].foreignCurrency}${transactions[pendingMatch].originalAmount}`;
+          converted++;
+          existingHashes.add(h);
+          continue;
+        }
+      }
+      // Fallback: date + merchant (normalized)
+      const pendingFallback = transactions.findIndex(t =>
+        t.pendingConversion &&
+        t.date === tx.date &&
+        t.merchant.trim().toLowerCase() === tx.merchant.trim().toLowerCase()
+      );
+      if (pendingFallback >= 0) {
+        transactions[pendingFallback].amount = tx.amount;
+        transactions[pendingFallback].pendingConversion = false;
+        transactions[pendingFallback].notes = (transactions[pendingFallback].notes ? transactions[pendingFallback].notes + ' | ' : '') +
+          `הומר מ-${transactions[pendingFallback].foreignCurrency}${transactions[pendingFallback].originalAmount}`;
+        converted++;
+        existingHashes.add(h);
+        continue;
+      }
+    }
+    // --- Plain duplicate check ---
+    if (existingHashes.has(h)) { dupes++; continue; }
+    unique.push(tx);
+    existingHashes.add(h);
+  }
+  return { unique, dupes, converted };
+}
+
+function normalizeRows(rows, source) {
+  const results = [];
+  // Determine the reference field name for this source
+  const schema = CSV_SCHEMAS[source];
+  const refFieldName = schema?.refField?.toLowerCase() || '';
+
+  for (const row of rows) {
+    const keys = Object.keys(row);
+    let date = '', merchant = '', amount = 0, ref = '', notes = '';
+    // Two-pass amount logic: prefer "סכום חיוב" (ILS charged) over "סכום עסקה" (original currency)
+    let amountCharge = null, amountTx = null, amountGeneric = null;
+    // Currency detection for foreign transactions
+    let currencyCharge = '', currencyTx = '', originalAmount = null;
+    for (const k of keys) {
+      const kl = k.trim().replace(/\n/g,' ').toLowerCase();
+      // Date: CSV "תאריך עסקה" or XLSX "תאריך רכישה" or Cal "תאריך\nעסקה"
+      if (!date && (kl.includes('תאריך עסקה') || kl.includes('תאריך רכישה') || kl.includes('ת.עסקה') || kl === 'תאריך' || kl === 'date')) date = parseDate(row[k]);
+      if (!merchant && (kl.includes('שם בית') || kl.includes('שם בית העסק') || kl.includes('שם בית עסק') || kl === 'merchant' || kl === 'description')) merchant = (row[k] || '').toString().replace(/\n/g,' ').trim();
+      // Amount: collect all candidates, pick best one after loop
+      if (kl.includes('סכום חיוב')) { const v = parseAmount(row[k]); if (v !== 0) amountCharge = v; }
+      else if (kl.includes('סכום עסקה')) { const v = parseAmount(row[k]); if (v !== 0) amountTx = v; }
+      else if (kl === 'סכום' || kl === 'amount') { const v = parseAmount(row[k]); if (v !== 0) amountGeneric = v; }
+      // Currency columns
+      if (kl.includes('מטבע חיוב')) currencyCharge = (row[k] || '').toString().trim();
+      if (kl.includes('מטבע עסקה')) currencyTx = (row[k] || '').toString().trim();
+      // Notes: capture "הערות" or "פירוט נוסף" for future use
+      if (kl === 'הערות' || kl.includes('פירוט נוסף')) { const v = (row[k] || '').toString().replace(/\n/g,' ').trim(); if (v) notes = notes ? notes + ' | ' + v : v; }
+      // Reference: CSV "מספר אסמכתא", XLSX Isracard "מס' שובר", Cal "מספר שובר"
+      if (!ref && refFieldName && kl.includes(refFieldName)) ref = (row[k] || '').toString().trim();
+      if (!ref && (kl.includes('אסמכתא') || kl.includes('מספר שובר') || kl.includes("מס' שובר") || kl.includes('שובר') || kl === 'reference')) ref = (row[k] || '').toString().trim();
+    }
+    // Priority: סכום חיוב > סכום עסקה > סכום/amount
+    amount = amountCharge ?? amountTx ?? amountGeneric ?? 0;
+    // Detect foreign currency: charge currency is not ₪ (and exists)
+    const isILS = v => !v || v === '₪' || v === 'ILS' || v === 'ש"ח';
+    let foreignCurrency = '';
+    if (!isILS(currencyCharge)) {
+      foreignCurrency = currencyCharge; // e.g. '$', '€', 'USD'
+      originalAmount = amountTx || amountCharge || 0;
+    } else if (!isILS(currencyTx) && isILS(currencyCharge)) {
+      // Transaction in foreign currency but charged in ILS — already converted, not pending
+      originalAmount = amountTx || 0;
+    }
+    if (!date && keys.length >= 1) date = parseDate(row[keys[0]]);
+    if (!merchant && keys.length >= 2) merchant = (row[keys[1]] || '').trim();
+    if (amount === 0 && keys.length >= 3) amount = parseAmount(row[keys[2]]);
+    if (date && merchant && amount !== 0) {
+      results.push({
+        date, merchant, amount: amount,
+        category: autoCategory(merchant),
+        source: source !== 'unknown' ? source : 'other',
+        ref: ref || '',
+        notes: notes || '',
+        foreignCurrency: foreignCurrency || '',
+        originalAmount: originalAmount ? Math.abs(originalAmount) : 0,
+        pendingConversion: !!foreignCurrency,
+        id: Date.now() + Math.random()
+      });
+    }
+  }
+  return results;
+}
+
+// ===== XLSX PARSER =====
+function parseXLSX(arrayBuffer, fileName) {
+  const wb = XLSX.read(arrayBuffer, { type: 'array', cellDates: false, raw: true });
+  const allRows = [];
+
+  for (const sheetName of wb.SheetNames) {
+    const ws = wb.Sheets[sheetName];
+    // Convert sheet to array of arrays (raw values)
+    const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+    if (!aoa || aoa.length === 0) continue;
+
+    // Known header field names to look for (across all CC companies)
+    const headerKeywords = ['תאריך רכישה', 'תאריך עסקה', 'שם בית עסק', 'שם בית העסק', 'סכום חיוב', 'סכום עסקה'];
+
+    // Scan rows to find header rows
+    let i = 0;
+    while (i < aoa.length) {
+      const row = aoa[i];
+      // Check if this row looks like a header (contains >=2 known keywords)
+      const cellTexts = row.map(c => (c == null ? '' : String(c)).replace(/\n/g, ' ').trim().toLowerCase());
+      const matchCount = headerKeywords.filter(kw => cellTexts.some(ct => ct.includes(kw.toLowerCase()))).length;
+
+      if (matchCount >= 2) {
+        // This is a header row — clean header names (strip newlines)
+        const headers = row.map(c => (c == null ? '' : String(c)).replace(/\n/g, ' ').trim());
+
+        // Detect source from this header
+        const source = detectSource(headers);
+
+        // Extract data rows until we hit an empty row, a summary row, or another section
+        let j = i + 1;
+        while (j < aoa.length) {
+          const dataRow = aoa[j];
+          // Stop conditions: empty row, section header row, or summary row
+          if (!dataRow || dataRow.length === 0 || dataRow.every(c => c === '' || c == null)) break;
+
+          // Check all cells for summary/section markers
+          const rowTexts = dataRow.map(c => String(c || '').trim());
+          const rowJoined = rowTexts.join(' ');
+          const firstCell = rowTexts[0];
+          const secondCell = rowTexts[1] || '';
+
+          // Skip summary rows ("סה"כ", "סך הכל"), section headers, footer text
+          const isSummary = rowJoined.includes('סה"כ') || rowJoined.includes('סך הכל') || rowJoined.includes('סיכום')
+            || rowJoined.includes('את המידע המלא') || rowJoined.includes('החיוב אינו סופי');
+          const isSectionHeader = firstCell.includes('עסקאות ') && !firstCell.match(/^\d/);
+
+          if (isSummary || isSectionHeader) {
+            // Check if the NEXT row is another header
+            if (j + 1 < aoa.length) {
+              const nextRow = aoa[j + 1];
+              const nextTexts = (nextRow || []).map(c => (c == null ? '' : String(c)).replace(/\n/g, ' ').trim().toLowerCase());
+              const nextMatch = headerKeywords.filter(kw => nextTexts.some(ct => ct.includes(kw.toLowerCase()))).length;
+              if (nextMatch >= 2) {
+                break; // Let outer loop pick up the next header
+              }
+            }
+            j++;
+            continue;
+          }
+
+          // Build row object from headers + data
+          const obj = {};
+          let hasData = false;
+          for (let col = 0; col < headers.length; col++) {
+            if (headers[col]) {
+              const val = col < dataRow.length ? dataRow[col] : '';
+              obj[headers[col]] = val;
+              if (val !== '' && val != null) hasData = true;
+            }
+          }
+          if (hasData) {
+            obj.__xlsxSource = source;
+            allRows.push(obj);
+          }
+          j++;
+        }
+        i = j; // Continue scanning from where we left off
+      } else {
+        i++;
+      }
+    }
+  }
+  return allRows;
+}
+
+// ===== WATCH FOLDER (File System Access API) =====
+let watchDirHandle = null;
+let importedFileNames = JSON.parse(localStorage.getItem('expIL_importedFiles') || '[]');
+
+function saveImportedFileNames() {
+  localStorage.setItem('expIL_importedFiles', JSON.stringify(importedFileNames));
+}
+
+async function pickWatchFolder() {
+  if (!('showDirectoryPicker' in window)) {
+    showToast(lang==='he' ? 'הדפדפן לא תומך בתכונה זו — נסה Chrome' : 'Browser does not support this feature — try Chrome', 'warn');
+    return;
+  }
+  try {
+    watchDirHandle = await window.showDirectoryPicker({ mode: 'read' });
+    document.getElementById('watchFolderName').textContent = '📂 ' + watchDirHandle.name;
+    document.getElementById('scanFolderBtn').style.display = 'inline-block';
+    showToast(lang==='he' ? `תיקייה "${watchDirHandle.name}" נבחרה — לחץ סרוק לבדיקת קבצים חדשים` : `Folder "${watchDirHandle.name}" selected — click Scan for new files`, 'success');
+    await scanWatchFolder();
+  } catch (e) {
+    if (e.name !== 'AbortError') showToast(e.message, 'error');
+  }
+}
+
+async function scanWatchFolder() {
+  if (!watchDirHandle) return;
+  const validExts = ['xlsx', 'xls', 'csv', 'tsv'];
+  const newFiles = [];
+  try {
+    for await (const [name, handle] of watchDirHandle) {
+      if (handle.kind !== 'file') continue;
+      const ext = name.split('.').pop().toLowerCase();
+      if (!validExts.includes(ext)) continue;
+      if (importedFileNames.includes(name)) continue;
+      newFiles.push({ name, handle });
+    }
+  } catch (e) {
+    showToast(lang==='he' ? 'שגיאה בקריאת התיקייה — נסה לבחור מחדש' : 'Error reading folder — try re-selecting', 'error');
+    return;
+  }
+
+  const resultsDiv = document.getElementById('watchFolderResults');
+  if (newFiles.length === 0) {
+    resultsDiv.innerHTML = `<p style="color:var(--text2);font-size:0.85em;text-align:center;">✅ ${lang==='he' ? 'אין קבצים חדשים בתיקייה' : 'No new files in folder'}</p>`;
+    return;
+  }
+
+  const label = lang==='he' ? `נמצאו ${newFiles.length} קבצים חדשים — לייבא?` : `Found ${newFiles.length} new files — import?`;
+  resultsDiv.innerHTML = `
+    <div class="card" style="padding:12px;text-align:center;">
+      <p style="margin-bottom:10px;font-weight:600;">${label}</p>
+      <div style="max-height:120px;overflow-y:auto;margin-bottom:10px;font-size:0.85em;color:var(--text2);">
+        ${newFiles.map(f => `<div>📄 ${esc(f.name)}</div>`).join('')}
+      </div>
+      <button onclick="importWatchFiles()" class="btn" style="background:var(--accent);color:#fff;padding:8px 20px;border-radius:8px;cursor:pointer;border:none;">
+        ${lang==='he' ? 'ייבא הכל' : 'Import All'}
+      </button>
+    </div>`;
+
+  // Store references for import
+  window._pendingWatchFiles = newFiles;
+}
+
+async function importWatchFiles() {
+  if (!window._pendingWatchFiles || window._pendingWatchFiles.length === 0) return;
+  const files = [];
+  for (const { name, handle } of window._pendingWatchFiles) {
+    try {
+      const file = await handle.getFile();
+      files.push(file);
+      importedFileNames.push(name);
+    } catch (e) {
+      showToast(`${esc(name)}: ${e.message}`, 'error');
+    }
+  }
+  saveImportedFileNames();
+  if (files.length > 0) handleFiles(files);
+  window._pendingWatchFiles = [];
+  document.getElementById('watchFolderResults').innerHTML = '';
+  await scanWatchFolder(); // Re-check for more
+}
+
+// Auto-scan on page load if folder was previously selected (requires re-permission)
+async function autoScanOnLoad() {
+  // File System Access API doesn't persist handles across sessions without IndexedDB
+  // But the imported file list persists, so re-selecting the folder is fast
+}
+
+// ===== FILE HANDLING =====
+const uploadArea = document.getElementById('uploadArea');
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+uploadArea.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadArea.classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+});
+
+// ===== AUTO-BACKUP BEFORE IMPORT (Step 0) =====
+function autoBackupBeforeImport() {
+  try {
+    const snapshot = JSON.stringify({ tx: transactions, budgets, backupDate: new Date().toISOString() });
+    localStorage.setItem('expenseIL_preImportBackup', snapshot);
+  } catch(e) { /* silent — quota exceeded is non-critical */ }
+}
+
+function determineBillingMonth(txList) {
+  // Find the most common month among transactions — that's the billing cycle month
+  const monthCounts = {};
+  txList.forEach(tx => {
+    if (tx.date) {
+      const m = tx.date.substring(0, 7);
+      monthCounts[m] = (monthCounts[m] || 0) + 1;
+    }
+  });
+  let bestMonth = '', bestCount = 0;
+  for (const [m, c] of Object.entries(monthCounts)) {
+    if (c > bestCount) { bestMonth = m; bestCount = c; }
+  }
+  return bestMonth;
+}
+
+async function processImportedRows(rows, source, fileName) {
+  const newTx = normalizeRows(rows, source);
+  // Assign billing month: all transactions from one file belong to the same billing cycle
+  const billingMonth = determineBillingMonth(newTx);
+  if (billingMonth) {
+    newTx.forEach(tx => { tx.billingMonth = billingMonth; });
+  }
+  const { unique, dupes, converted } = deduplicateNew(newTx);
+  transactions = transactions.concat(unique);
+  await saveData();
+  let msg = lang==='he'
+    ? `${esc(fileName)}: ${unique.length} עסקאות חדשות (${source})`
+    : `${esc(fileName)}: ${unique.length} new transactions (${source})`;
+  if (dupes > 0) msg += lang==='he' ? ` | ${dupes} כפולות סוננו` : ` | ${dupes} duplicates skipped`;
+  if (converted > 0) msg += lang==='he' ? ` | ${converted} עסקאות הומרו לשקלים` : ` | ${converted} foreign transactions converted to ILS`;
+  showToast(msg, 'success');
+  addImportLog('success', fileName, `${unique.length} imported, ${dupes} dupes skipped, ${converted} converted [${source}]`);
+  refreshAll();
+  renderImportLog();
+}
+
+function handleFiles(files) {
+  autoBackupBeforeImport();
+  for (const file of files) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'csv' || ext === 'tsv') {
+      Papa.parse(file, {
+        header: true, encoding: 'UTF-8', skipEmptyLines: true,
+        complete: result => {
+          if (result.data.length === 0) { showToast(esc(file.name) + ': empty file', 'warn'); addImportLog('warn', file.name, lang==='he'?'קובץ ריק':'Empty file'); return; }
+          const fields = result.meta.fields || [];
+          const source = detectSource(fields);
+
+          const validation = validateColumns(fields, source);
+          if (!validation.ok) {
+            const errMsg = lang==='he'
+              ? `${esc(file.name)}: פורמט לא מוכר — ${validation.reason}`
+              : `${esc(file.name)}: Unknown format — ${validation.reason}`;
+            showToast(errMsg, 'error');
+            addImportLog('error', file.name, validation.reason);
+            return;
+          }
+          if (validation.warnings.length > 0) {
+            validation.warnings.forEach(w => addImportLog('warn', file.name, w));
+          }
+          processImportedRows(result.data, source, file.name);
+        },
+        error: err => { showToast(`${esc(file.name)}: ${err.message}`, 'error'); addImportLog('error', file.name, err.message); renderImportLog(); }
+      });
+    } else if (ext === 'xlsx' || ext === 'xls') {
+      // ===== XLSX IMPORT =====
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const rows = parseXLSX(e.target.result, file.name);
+          if (rows.length === 0) {
+            showToast(lang==='he' ? `${esc(file.name)}: לא נמצאו עסקאות` : `${esc(file.name)}: No transactions found`, 'warn');
+            addImportLog('warn', file.name, lang==='he'?'לא נמצאו עסקאות':'No transactions found');
+            renderImportLog();
+            return;
+          }
+          // Detect source from the first row's keys
+          const headers = Object.keys(rows[0]).filter(k => k !== '__xlsxSource');
+          let source = rows[0].__xlsxSource || detectSource(headers);
+          // Remove internal marker
+          rows.forEach(r => delete r.__xlsxSource);
+          processImportedRows(rows, source, file.name);
+        } catch(err) {
+          showToast(`${esc(file.name)}: ${err.message}`, 'error');
+          addImportLog('error', file.name, err.message);
+          renderImportLog();
+        }
+      };
+      reader.onerror = function() {
+        showToast(`${esc(file.name)}: File read error`, 'error');
+        addImportLog('error', file.name, 'File read error');
+        renderImportLog();
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      showToast(lang==='he' ? 'השתמש בפורמט CSV או XLSX' : 'Please use CSV or XLSX format', 'warn');
+      addImportLog('warn', file.name, lang==='he'?'פורמט לא נתמך':'Unsupported format');
+    }
+  }
+}
+
+// ===== IMPORT LOG / DIAGNOSTICS (Step 1c) =====
+const importLogEntries = [];
+
+function addImportLog(level, fileName, message) {
+  importLogEntries.push({
+    time: new Date().toLocaleTimeString('he-IL'),
+    level, // 'success' | 'warn' | 'error'
+    fileName,
+    message
+  });
+}
+
+function renderImportLog() {
+  const container = document.getElementById('importLogContainer');
+  const entries = document.getElementById('importLogEntries');
+  if (importLogEntries.length === 0) { container.style.display = 'none'; return; }
+  container.style.display = 'block';
+
+  const icons = { success: '✅', warn: '⚠️', error: '❌' };
+  const colors = { success: 'var(--green)', warn: 'var(--orange)', error: 'var(--red)' };
+
+  entries.innerHTML = importLogEntries.map(e =>
+    `<div style="padding:6px 0;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:flex-start;">
+      <span>${icons[e.level] || '📋'}</span>
+      <span style="color:var(--text2);min-width:60px;">${esc(e.time)}</span>
+      <span style="font-weight:600;">${esc(e.fileName)}</span>
+      <span style="color:${colors[e.level] || 'var(--text)'};">${esc(e.message)}</span>
+    </div>`
+  ).reverse().join('');
+}
+
+function clearImportLog() {
+  importLogEntries.length = 0;
+  document.getElementById('importLogContainer').style.display = 'none';
+}
+
+// ===== BACKUP / RESTORE (Fix #5 — encrypted backups) =====
+async function exportBackup() {
+  const payload = { version: 3, transactions, budgets, learnedCats, exportDate: new Date().toISOString() };
+  let blob;
+  if (cryptoKey) {
+    // Encrypted backup: encrypt the JSON payload with the same PIN-derived key
+    const encrypted = await encryptData(payload, cryptoKey);
+    const wrapper = { encrypted: true, data: encrypted };
+    blob = new Blob([JSON.stringify(wrapper)], { type: 'application/json' });
+  } else {
+    blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `expenseIL_backup_${new Date().toISOString().substring(0,10)}.json`;
+  a.click(); URL.revokeObjectURL(url);
+  showToast(lang==='he' ? 'גיבוי מוצפן הורד בהצלחה!' : 'Encrypted backup downloaded!', 'success');
+}
+
+async function importBackup(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const raw = JSON.parse(e.target.result);
+      let data;
+      if (raw.encrypted) {
+        // Encrypted backup — need PIN to decrypt
+        if (!cryptoKey) {
+          showToast(lang==='he' ? 'הגיבוי מוצפן. יש להזין PIN קודם.' : 'Backup is encrypted. Enter PIN first.', 'error');
+          return;
+        }
+        data = await decryptData(raw.data, cryptoKey);
+        if (!data) {
+          showToast(lang==='he' ? 'פענוח נכשל — PIN שגוי או קובץ פגום' : 'Decryption failed — wrong PIN or corrupt file', 'error');
+          return;
+        }
+      } else {
+        // Plaintext backup (legacy v2 or unencrypted)
+        data = raw;
+      }
+      if (data.transactions) {
+        const { unique, dupes, converted } = deduplicateNew(data.transactions);
+        transactions = transactions.concat(unique);
+      }
+      if (data.budgets) {
+        for (const [m, cats] of Object.entries(data.budgets)) {
+          if (!budgets[m]) budgets[m] = {};
+          Object.assign(budgets[m], cats);
+        }
+      }
+      if (data.learnedCats) {
+        Object.assign(learnedCats, data.learnedCats);
+      }
+      await saveData();
+      refreshAll();
+      showToast(lang==='he' ? 'שוחזר בהצלחה!' : 'Restored successfully!', 'success');
+    } catch {
+      showToast(lang==='he' ? 'קובץ לא תקין' : 'Invalid file', 'error');
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ===== MANUAL ADD =====
+async function addManual() {
+  const date = document.getElementById('manualDate').value;
+  const merchant = document.getElementById('manualMerchant').value.trim();
+  const amount = parseFloat(document.getElementById('manualAmount').value);
+  const category = document.getElementById('manualCategory').value;
+  if (!date || !merchant || !amount) return;
+  transactions.push({ date, merchant, amount: amount, category, source: 'manual', id: Date.now() + Math.random() });
+  await saveData(); refreshAll();
+  document.getElementById('manualMerchant').value = '';
+  document.getElementById('manualAmount').value = '';
+  showToast(lang==='he' ? 'עסקה נוספה!' : 'Transaction added!');
+}
+
+async function clearAllData() {
+  if (!confirm(lang === 'he' ? 'למחוק את כל הנתונים?' : 'Delete all data?')) return;
+  transactions = []; budgets = {};
+  await saveData(); refreshAll();
+  showToast(lang==='he' ? 'כל הנתונים נמחקו' : 'All data cleared', 'warn');
+}
+
+// ===== MONTH HELPERS =====
+function getMonths() {
+  const months = new Set();
+  transactions.forEach(tx => { if (tx.date) months.add(tx.date.substring(0, 7)); });
+  return [...months].sort().reverse();
+}
+function getCurrentMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+}
+
+// ===== RENDERING =====
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + tab).style.display = 'block';
+  const tabEl = document.querySelector(`.tab[data-tab="${tab}"]`);
+  if (tabEl) tabEl.classList.add('active');
+  if (tab === 'dashboard') renderDashboard();
+  if (tab === 'transactions') renderTransactions();
+  if (tab === 'budget') renderBudget();
+  if (tab === 'compare') renderCompare();
+  if (tab === 'recurring') renderRecurring();
+}
+
+function refreshAll() {
+  populateFilters();
+  renderDashboard();
+  renderTransactions();
+  renderLearnedRules();
+}
+
+function populateFilters() {
+  const months = getMonths();
+  const filterMonth = document.getElementById('filterMonth');
+  const curFM = filterMonth.value;
+  filterMonth.innerHTML = `<option value="">${lang==='he'?'כל החודשים':'All Months'}</option>` + months.map(m => `<option value="${m}" ${m===curFM?'selected':''}>${m}</option>`).join('');
+  const cats = Object.keys(CATEGORIES);
+  const filterCat = document.getElementById('filterCategory');
+  const curFC = filterCat.value;
+  filterCat.innerHTML = `<option value="">${lang==='he'?'כל הקטגוריות':'All Categories'}</option>` + cats.map(c => `<option value="${c}" ${c===curFC?'selected':''}>${CATEGORIES[c][lang]} ${CATEGORIES[c].icon}</option>`).join('');
+  document.getElementById('manualCategory').innerHTML = cats.map(c => `<option value="${c}">${CATEGORIES[c][lang]} ${CATEGORIES[c].icon}</option>`).join('');
+  const budgetMonth = document.getElementById('budgetMonth');
+  budgetMonth.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
+  if (!budgetMonth.value && months.length) budgetMonth.value = months[0];
+  const cm1 = document.getElementById('compareMonth1');
+  const cm2 = document.getElementById('compareMonth2');
+  const opts = months.map(m => `<option value="${m}">${m}</option>`).join('');
+  cm1.innerHTML = opts; cm2.innerHTML = opts;
+  if (months.length >= 2) { cm1.value = months[0]; cm2.value = months[1]; }
+  document.getElementById('filterSearch').placeholder = lang==='he' ? 'חיפוש...' : 'Search...';
+}
+
+// ===== DASHBOARD (Fix #6 welcome, Fix #9 forecast, Fix #10 budget alerts) =====
+let chartInstances = {};
+let dashboardMonth = null; // null = current month
+function destroyChart(id) { if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; } }
+
+function changeDashMonth(delta) {
+  const months = getMonths();
+  if (months.length === 0) return;
+  const cm = dashboardMonth || getCurrentMonth();
+  const idx = months.indexOf(cm);
+  if (idx === -1) {
+    dashboardMonth = months[0];
+  } else {
+    const newIdx = idx - delta; // months are sorted descending, so -delta for forward
+    if (newIdx >= 0 && newIdx < months.length) dashboardMonth = months[newIdx];
+  }
+  renderDashboard();
+}
+
+function renderDeltaTable(currentMonth, monthTx) {
+  const el = document.getElementById('deltaTable');
+  const months = getMonths();
+  const ci = months.indexOf(currentMonth);
+  // Need a previous month in the data
+  if (ci < 0 || ci >= months.length - 1) { el.innerHTML = ''; return; }
+  const prevMonth = months[ci + 1]; // months sorted desc, so +1 = older
+  const prevTx = transactions.filter(tx => tx.date && tx.date.substring(0,7) === prevMonth && !tx.pendingConversion);
+  const curTx = monthTx.filter(tx => !tx.pendingConversion);
+  if (curTx.length === 0 && prevTx.length === 0) { el.innerHTML = ''; return; }
+
+  // Sum by category
+  const sumBy = (arr) => {
+    const m = {};
+    arr.forEach(tx => { if (tx.amount > 0) m[tx.category] = (m[tx.category]||0) + tx.amount; });
+    return m;
+  };
+  const curCats = sumBy(curTx), prevCats = sumBy(prevTx);
+  const allCats = new Set([...Object.keys(curCats), ...Object.keys(prevCats)]);
+
+  const rows = [];
+  let totalCur = 0, totalPrev = 0;
+  allCats.forEach(cat => {
+    const cur = curCats[cat]||0, prev = prevCats[cat]||0;
+    totalCur += cur; totalPrev += prev;
+    const diff = cur - prev;
+    const pct = prev > 0 ? ((diff / prev)*100) : (cur > 0 ? 100 : 0);
+    rows.push({ cat, cur, prev, diff, pct });
+  });
+  // Sort by absolute diff descending
+  rows.sort((a,b) => Math.abs(b.diff) - Math.abs(a.diff));
+
+  const he = lang === 'he';
+  const [py, pm] = prevMonth.split('-');
+  const mNames = he
+    ? ['ינו','פבר','מרץ','אפר','מאי','יונ','יול','אוג','ספט','אוק','נוב','דצמ']
+    : ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const prevLabel = `${mNames[parseInt(pm)-1]}`;
+
+  const arrow = (d) => d > 0 ? '▲' : d < 0 ? '▼' : '—';
+  const cls = (d) => d > 0 ? 'delta-up' : d < 0 ? 'delta-down' : 'delta-neutral';
+
+  let html = `<div class="delta-table-wrap"><h3>${he?'השוואה לחודש קודם':'Month-over-Month'}</h3><table class="delta-table"><thead><tr>
+    <th>${he?'קטגוריה':'Category'}</th>
+    <th>${prevLabel}</th>
+    <th>${he?'נוכחי':'Current'}</th>
+    <th>${he?'שינוי':'Change'}</th></tr></thead><tbody>`;
+
+  rows.forEach(r => {
+    const c = CATEGORIES[r.cat] || CATEGORIES.other;
+    html += `<tr>
+      <td>${c.icon} ${c[lang]}</td>
+      <td>${fmtILS(r.prev)}</td>
+      <td>${fmtILS(r.cur)}</td>
+      <td class="${cls(r.diff)}">${arrow(r.diff)} ${fmtILS(Math.abs(r.diff))} (${r.diff===0?'—':((r.diff>0?'+':'')+Math.round(r.pct)+'%')})</td>
+    </tr>`;
+  });
+
+  // Total row
+  const totalDiff = totalCur - totalPrev;
+  const totalPct = totalPrev > 0 ? ((totalDiff/totalPrev)*100) : (totalCur > 0 ? 100 : 0);
+  html += `<tr>
+    <td>${he?'סה״כ':'Total'}</td>
+    <td>${fmtILS(totalPrev)}</td>
+    <td>${fmtILS(totalCur)}</td>
+    <td class="${cls(totalDiff)}">${arrow(totalDiff)} ${fmtILS(Math.abs(totalDiff))} (${totalDiff===0?'—':((totalDiff>0?'+':'')+Math.round(totalPct)+'%')})</td>
+  </tr>`;
+
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+function renderDashboard() {
+  const welcome = document.getElementById('dashboardWelcome');
+  const content = document.getElementById('dashboardContent');
+  if (transactions.length === 0) {
+    welcome.style.display = 'block'; content.style.display = 'none'; return;
+  }
+  welcome.style.display = 'none'; content.style.display = 'block';
+
+  const months = getMonths();
+  if (!dashboardMonth || months.indexOf(dashboardMonth) === -1) {
+    // Default to current month if it has data, otherwise most recent month with data
+    dashboardMonth = months.indexOf(getCurrentMonth()) !== -1 ? getCurrentMonth() : (months[0] || getCurrentMonth());
+  }
+  const cm = dashboardMonth;
+
+  // Update month navigation label
+  const midx = months.indexOf(cm);
+  const [y, m] = cm.split('-');
+  const monthNames = lang === 'he'
+    ? ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר']
+    : ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('dashMonthLabel').textContent = `${monthNames[parseInt(m)-1]} ${y}`;
+  // Disable prev/next if at boundary
+  const navBtns = document.getElementById('dashMonthNav').querySelectorAll('button');
+  navBtns[0].disabled = (midx >= months.length - 1); // prev (older)
+  navBtns[1].disabled = (midx <= 0); // next (newer)
+  const monthTx = transactions.filter(tx => {
+    const txMonth = tx.date ? tx.date.substring(0, 7) : '';
+    return txMonth === cm;
+  });
+  const confirmedTx = monthTx.filter(tx => !tx.pendingConversion);
+  const pendingTx = monthTx.filter(tx => tx.pendingConversion);
+  const total = confirmedTx.reduce((s, tx) => s + tx.amount, 0);
+  const credits = confirmedTx.filter(tx => tx.amount < 0).reduce((s, tx) => s + tx.amount, 0);
+  const txCount = monthTx.length;
+  const chargeTx = confirmedTx.filter(tx => tx.amount > 0);
+  const avgTx = chargeTx.length > 0 ? chargeTx.reduce((s,tx) => s + tx.amount, 0) / chargeTx.length : 0;
+  const totalBudget = Object.values(budgets[cm] || {}).reduce((s, v) => s + v, 0);
+
+  // Group pending foreign transactions by currency
+  const pendingByCurrency = {};
+  pendingTx.forEach(tx => {
+    const cur = tx.foreignCurrency || '?';
+    pendingByCurrency[cur] = (pendingByCurrency[cur] || 0) + tx.amount;
+  });
+  const pendingLabel = Object.entries(pendingByCurrency).map(([cur, sum]) => `${cur}${Math.round(sum)}`).join(' / ');
+
+  let statsHtml = `
+    <div class="stat-card"><div class="label">${lang==='he'?'הוצאות מאושרות':'Confirmed Expenses'}</div><div class="value expense">${fmtILS(total)}</div></div>
+    <div class="stat-card"><div class="label">${lang==='he'?'עסקאות':'Transactions'}</div><div class="value neutral">${txCount}</div></div>
+    <div class="stat-card"><div class="label">${lang==='he'?'ממוצע לעסקה':'Avg Transaction'}</div><div class="value neutral">${fmtILS(avgTx)}</div></div>
+    <div class="stat-card"><div class="label">${lang==='he'?'תקציב נותר':'Budget Left'}</div><div class="value ${totalBudget - total >= 0 ? 'budget' : 'expense'}">${fmtILS(totalBudget - total)}</div></div>
+  `;
+  if (credits < 0) {
+    statsHtml += `<div class="stat-card" style="border:1px solid rgba(22,163,74,0.3);background:rgba(22,163,74,0.06);">
+      <div class="label" style="color:#16a34a;">${lang==='he'?'זיכויים/החזרים':'Credits/Refunds'}</div>
+      <div class="value" style="color:#16a34a;">${fmtILS(Math.abs(credits))}</div>
+    </div>`;
+  }
+  if (pendingTx.length > 0) {
+    statsHtml += `<div class="stat-card" style="border:1px solid rgba(251,191,36,0.4);background:rgba(251,191,36,0.06);">
+      <div class="label" style="color:#d97706;">⏳ ${lang==='he'?'ממתין להמרה':'Pending Conversion'}</div>
+      <div class="value" style="color:#d97706;font-size:1.1em;">${esc(pendingLabel)}</div>
+      <div style="font-size:0.75em;color:var(--text2);margin-top:2px;">${pendingTx.length} ${lang==='he'?'עסקאות':'transactions'}</div>
+    </div>`;
+  }
+  document.getElementById('statsRow').innerHTML = statsHtml;
+
+  // Forecast (Fix #9) — only for current month
+  const now = new Date();
+  const fb = document.getElementById('forecastBox');
+  if (cm === getCurrentMonth()) {
+    const dayOfMonth = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+    if (dayOfMonth >= 3 && monthTx.length >= 3) {
+      const forecast = Math.round((total / dayOfMonth) * daysInMonth);
+      fb.innerHTML = `<div class="forecast-box"><div class="f-label">${lang==='he'?'תחזית לסוף החודש':'End of Month Forecast'}</div><div class="f-value">${fmtILS(forecast)}</div></div>`;
+    } else { fb.innerHTML = ''; }
+  } else { fb.innerHTML = ''; }
+
+  // Budget alerts (Fix #10)
+  const alerts = [];
+  if (budgets[cm]) {
+    for (const [cat, bgt] of Object.entries(budgets[cm])) {
+      const spent = monthTx.filter(tx => tx.category === cat).reduce((s,tx) => s + tx.amount, 0);
+      const pct = bgt > 0 ? (spent / bgt) * 100 : 0;
+      if (pct >= 80) {
+        const c = CATEGORIES[cat] || CATEGORIES.other;
+        const status = pct >= 100 ? (lang==='he'?'חריגה!':'Over budget!') : (lang==='he'?'מתקרב למגבלה':'Approaching limit');
+        alerts.push(`<div style="background:${pct>=100?'rgba(248,113,113,0.1)':'rgba(251,191,36,0.1)'};border:1px solid ${pct>=100?'rgba(248,113,113,0.3)':'rgba(251,191,36,0.3)'};border-radius:10px;padding:10px 16px;margin-bottom:8px;font-size:0.9em;">${c.icon} ${c[lang]}: ${status} (${Math.round(pct)}%)</div>`);
+      }
+    }
+  }
+  document.getElementById('budgetAlerts').innerHTML = alerts.join('');
+
+  renderDeltaTable(cm, monthTx);
+
+  renderChartSafe('chartCategory', monthTx.length > 0, () => renderCategoryChart(monthTx));
+  renderChartSafe('chartMonthly', transactions.length > 0, () => renderMonthlyChart());
+  renderChartSafe('chartCard', monthTx.length > 0, () => renderCardChart(monthTx));
+  renderChartSafe('chartDaily', monthTx.length > 0, () => renderDailyChart(monthTx));
+}
+
+function renderChartSafe(id, hasData, renderFn) {
+  const canvas = document.getElementById(id);
+  const empty = document.getElementById(id + 'Empty');
+  if (!hasData || typeof Chart === 'undefined') {
+    destroyChart(id); canvas.style.display = 'none';
+    if(empty) { empty.style.display = 'block'; if(typeof Chart === 'undefined') empty.innerHTML = '<p style="color:#f87171;">Chart.js לא נטען — בדוק חיבור אינטרנט</p>'; }
+    return;
+  }
+  try {
+    canvas.style.display = 'block'; if(empty) empty.style.display = 'none';
+    renderFn();
+  } catch(e) {
+    console.error('Chart render error (' + id + '):', e);
+    canvas.style.display = 'none';
+    if(empty) { empty.style.display = 'block'; empty.innerHTML = '<p style="color:#f87171;">שגיאה בטעינת גרף</p>'; }
+  }
+}
+
+function fmtILS(n) { return '₪' + Math.round(n).toLocaleString('he-IL'); }
+
+function renderCategoryChart(txs) {
+  const data = {};
+  txs.forEach(tx => { data[tx.category] = (data[tx.category] || 0) + tx.amount; });
+  const sorted = Object.entries(data).sort((a,b) => b[1] - a[1]);
+  destroyChart('chartCategory');
+  chartInstances['chartCategory'] = new Chart(document.getElementById('chartCategory'), {
+    type: 'doughnut',
+    data: { labels: sorted.map(([c]) => `${CATEGORIES[c]?.icon||''} ${CATEGORIES[c]?.[lang]||c}`), datasets: [{ data: sorted.map(([,v]) => Math.round(v)), backgroundColor: sorted.map(([c]) => CATEGORIES[c]?.color || '#6b7280'), borderWidth: 0 }] },
+    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#e4e4e7', padding: 12 } } } }
+  });
+}
+function renderMonthlyChart() {
+  const data = {};
+  transactions.forEach(tx => { const m = tx.date?.substring(0,7); if(m) data[m] = (data[m]||0) + tx.amount; });
+  const sorted = Object.entries(data).sort((a,b) => a[0].localeCompare(b[0])).slice(-12);
+  destroyChart('chartMonthly');
+  chartInstances['chartMonthly'] = new Chart(document.getElementById('chartMonthly'), {
+    type: 'bar',
+    data: { labels: sorted.map(([m]) => m), datasets: [{ label: lang==='he'?'הוצאות':'Expenses', data: sorted.map(([,v]) => Math.round(v)), backgroundColor: '#6366f1', borderRadius: 6 }] },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#b0b7c3' }, grid: { display: false } }, y: { ticks: { color: '#b0b7c3', callback: v => '₪'+v.toLocaleString() }, grid: { color: '#2e3347' } } } }
+  });
+}
+function renderCardChart(txs) {
+  const data = {};
+  txs.forEach(tx => { data[tx.source] = (data[tx.source]||0) + tx.amount; });
+  const labels = { isracard: 'ישראכרט', max: 'מקס', cal: 'כאל', manual: lang==='he'?'ידני':'Manual', other: lang==='he'?'אחר':'Other' };
+  const colors = { isracard: '#6366f1', max: '#fbbf24', cal: '#34d399', manual: '#94a3b8', other: '#6b7280' };
+  destroyChart('chartCard');
+  const entries = Object.entries(data);
+  chartInstances['chartCard'] = new Chart(document.getElementById('chartCard'), {
+    type: 'pie',
+    data: { labels: entries.map(([k]) => labels[k]||k), datasets: [{ data: entries.map(([,v]) => Math.round(v)), backgroundColor: entries.map(([k]) => colors[k]||'#6b7280'), borderWidth: 0 }] },
+    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#e4e4e7' } } } }
+  });
+}
+function renderDailyChart(txs) {
+  const data = {};
+  txs.forEach(tx => { if(tx.date) data[tx.date] = (data[tx.date]||0) + tx.amount; });
+  const days = Object.entries(data).sort((a,b) => a[0].localeCompare(b[0]));
+  let cum = 0;
+  const cumData = days.map(([,v]) => { cum += v; return Math.round(cum); });
+  destroyChart('chartDaily');
+  chartInstances['chartDaily'] = new Chart(document.getElementById('chartDaily'), {
+    type: 'line',
+    data: { labels: days.map(([d]) => d.substring(8)), datasets: [{ label: lang==='he'?'מצטבר':'Cumulative', data: cumData, borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.1)', fill: true, tension: 0.3, pointRadius: 3 }] },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#b0b7c3' }, grid: { display: false } }, y: { ticks: { color: '#b0b7c3', callback: v => '₪'+v.toLocaleString() }, grid: { color: '#2e3347' } } } }
+  });
+}
+
+// ===== TRANSACTIONS TABLE (Fix #1 — escaped output) =====
+function getFilteredTx() {
+  let txs = [...transactions];
+  const search = document.getElementById('filterSearch').value.toLowerCase();
+  const month = document.getElementById('filterMonth').value;
+  const cat = document.getElementById('filterCategory').value;
+  const source = document.getElementById('filterSource').value;
+  if (search) txs = txs.filter(tx => tx.merchant.toLowerCase().includes(search));
+  if (month) txs = txs.filter(tx => tx.date?.startsWith(month));
+  if (cat) txs = txs.filter(tx => tx.category === cat);
+  if (source) txs = txs.filter(tx => tx.source === source);
+  return txs.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+}
+
+function renderTransactions() {
+  const txs = getFilteredTx();
+  const body = document.getElementById('txBody');
+  const empty = document.getElementById('txEmpty');
+  if (txs.length === 0) { body.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  body.innerHTML = txs.map(tx => {
+    const cat = CATEGORIES[tx.category] || CATEGORIES.other;
+    const sourceLabel = { isracard: 'ישראכרט', max: 'מקס', cal: 'כאל', manual: 'ידני' }[tx.source] || tx.source;
+    const sourceClass = 'source-' + esc(tx.source);
+    const idx = transactions.indexOf(tx);
+    const isPending = tx.pendingConversion;
+    const rowStyle = isPending ? 'background:rgba(251,191,36,0.07);' : '';
+    const isCredit = tx.amount < 0;
+    const amountDisplay = isPending
+      ? `<span style="color:#d97706;" title="${lang==='he'?'ממתין להמרה לשקלים':'Pending ILS conversion'}">⏳ ${esc(tx.foreignCurrency)}${Math.abs(tx.amount).toFixed(2)}</span>`
+      : isCredit
+        ? `<span class="amount-credit" title="${lang==='he'?'זיכוי/החזר':'Credit/Refund'}">+${fmtILS(Math.abs(tx.amount))}</span>`
+        : fmtILS(tx.amount);
+    const amountClass = isPending ? '' : isCredit ? 'amount-credit' : 'amount-negative';
+    return `<tr style="${rowStyle}">
+      <td>${esc(tx.date || '-')}</td>
+      <td>${esc(tx.merchant)}${isPending ? `<span style="font-size:0.7em;color:#d97706;margin-right:6px;">${lang==='he'?'ממתין להמרה':'pending'}</span>` : ''}</td>
+      <td class="amount-cell ${amountClass}">${amountDisplay}</td>
+      <td><span class="category-badge" style="cursor:pointer;" onclick="openCatModal(${idx})">${cat.icon} ${cat[lang]}</span></td>
+      <td class="col-card"><span class="source-badge ${sourceClass}">${esc(sourceLabel)}</span></td>
+      <td><button class="btn btn-danger" style="padding:4px 10px;font-size:0.8em;" onclick="deleteTx(${idx})">&#10005;</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function deleteTx(idx) { transactions.splice(idx, 1); await saveData(); refreshAll(); }
+
+// ===== CATEGORY MODAL =====
+function openCatModal(idx) {
+  editingTxIdx = idx;
+  document.getElementById('catModalSelect').innerHTML = Object.keys(CATEGORIES).map(c => `<option value="${c}" ${transactions[idx].category===c?'selected':''}>${CATEGORIES[c].icon} ${CATEGORIES[c][lang]}</option>`).join('');
+  document.getElementById('catModal').classList.add('show');
+}
+function closeCatModal() { document.getElementById('catModal').classList.remove('show'); }
+async function saveCatModal() {
+  if (editingTxIdx >= 0) {
+    const newCat = document.getElementById('catModalSelect').value;
+    const tx = transactions[editingTxIdx];
+    const oldCat = tx.category;
+    tx.category = newCat;
+    // Learn: remember this merchant→category for future auto-categorization
+    if (tx.merchant) await saveLearnedCategory(tx.merchant, newCat);
+    try {
+      await saveData();
+      refreshAll();
+      const catName = CATEGORIES[newCat] ? CATEGORIES[newCat][lang] : newCat;
+      showToast(lang==='he' ? `קטגוריה עודכנה ל${catName}` : `Category changed to ${catName}`, 'success');
+    } catch(e) {
+      tx.category = oldCat; // revert on failure
+      showToast(lang==='he' ? 'שגיאה בשמירה' : 'Save error', 'error');
+    }
+  }
+  closeCatModal();
+}
+
+// ===== BUDGET =====
+function renderBudget() {
+  const month = document.getElementById('budgetMonth').value;
+  if (!month) return;
+  if (!budgets[month]) budgets[month] = {};
+  const monthTx = transactions.filter(tx => tx.date?.substring(0,7) === month);
+  const spending = {};
+  monthTx.forEach(tx => { if (tx.amount > 0) spending[tx.category] = (spending[tx.category]||0) + tx.amount; });
+  // Show ALL categories so user can set budgets proactively
+  const cats = Object.keys(CATEGORIES);
+  const content = document.getElementById('budgetContent');
+
+  // Total summary
+  const totalBudget = Object.values(budgets[month]).reduce((s,v) => s+v, 0);
+  const totalSpent = Object.values(spending).reduce((s,v) => s+v, 0);
+  const totalPct = totalBudget > 0 ? (totalSpent/totalBudget)*100 : 0;
+  const totalBarClass = totalPct < 70 ? 'ok' : totalPct < 100 ? 'warn' : 'over';
+
+  // Copy from previous month button
+  const months = getMonths();
+  const mi = months.indexOf(month);
+  const hasPrev = mi >= 0 && mi < months.length - 1 && budgets[months[mi+1]] && Object.keys(budgets[months[mi+1]]).length > 0;
+  const copyBtn = hasPrev ? `<button class="btn btn-secondary" onclick="copyBudgetFromPrev('${esc(month)}')" style="font-size:0.8em;padding:6px 14px;">📋 ${lang==='he'?'העתק מחודש קודם':'Copy from last month'}</button>` : '';
+
+  let html = `<div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">${copyBtn}</div>`;
+  if (totalBudget > 0) {
+    html += `<div class="budget-row" style="border:2px solid var(--accent);margin-bottom:16px;">
+      <span class="cat-name" style="font-weight:700;">📊 ${lang==='he'?'סה״כ':'Total'}</span>
+      <span style="min-width:100px;text-align:left;font-weight:700;color:${totalPct>=100?'var(--red)':'var(--text)'};">${fmtILS(totalSpent)}</span>
+      <span style="color:var(--text2);">/</span>
+      <span style="min-width:120px;text-align:center;font-weight:600;">${fmtILS(totalBudget)}</span>
+      <div class="budget-bar-container"><div class="budget-bar ${totalBarClass}" style="width:${Math.min(totalPct,100)}%;"></div><span class="budget-pct">${Math.round(totalPct)}%</span></div>
+    </div>`;
+  }
+
+  html += cats.map(c => {
+    const cat = CATEGORIES[c] || CATEGORIES.other;
+    const spent = spending[c] || 0;
+    const budget = budgets[month]?.[c] || 0;
+    const pct = budget > 0 ? Math.min((spent / budget) * 100, 150) : 0;
+    const barClass = pct < 70 ? 'ok' : pct < 100 ? 'warn' : 'over';
+    return `<div class="budget-row">
+      <span class="cat-name">${cat.icon} ${esc(cat[lang])}</span>
+      <span style="min-width:100px;text-align:left;font-weight:600;color:var(--red);">${fmtILS(spent)}</span>
+      <span style="color:var(--text2);">/</span>
+      <input type="number" value="${budget || ''}" placeholder="${fmtILS(0)}" onchange="setBudget('${esc(month)}','${esc(c)}',this.value)">
+      <div class="budget-bar-container"><div class="budget-bar ${barClass}" style="width:${Math.min(pct,100)}%;"></div>${budget > 0 ? `<span class="budget-pct">${Math.round(pct)}%</span>` : ''}</div>
+    </div>`;
+  }).join('');
+  content.innerHTML = html;
+}
+async function copyBudgetFromPrev(month) {
+  const months = getMonths();
+  const mi = months.indexOf(month);
+  if (mi < 0 || mi >= months.length - 1) return;
+  const prev = months[mi+1];
+  if (!budgets[prev]) return;
+  if (!budgets[month]) budgets[month] = {};
+  for (const [cat, val] of Object.entries(budgets[prev])) {
+    if (!budgets[month][cat]) budgets[month][cat] = val;
+  }
+  await saveData(); renderBudget(); renderDashboard();
+  showToast(lang==='he'?'תקציבים הועתקו מחודש קודם':'Budgets copied from last month','ok');
+}
+async function setBudget(month, cat, val) {
+  if (!budgets[month]) budgets[month] = {};
+  budgets[month][cat] = parseFloat(val) || 0;
+  await saveData(); renderBudget(); renderDashboard();
+}
+
+// ===== RECURRING TRANSACTIONS (Fix #7) =====
+function renderRecurring() {
+  const months = getMonths();
+  if (months.length < 2) {
+    document.getElementById('recurringList').innerHTML = `<div class="empty-state"><p>${lang==='he'?'צריך לפחות 2 חודשים של נתונים':'Need at least 2 months of data'}</p></div>`;
+    document.getElementById('recurringTotal').innerHTML = '';
+    return;
+  }
+  const merchantMonths = {};
+  transactions.forEach(tx => {
+    const m = tx.date?.substring(0,7);
+    if (!m) return;
+    const key = tx.merchant.trim().toLowerCase();
+    if (!merchantMonths[key]) merchantMonths[key] = { name: tx.merchant, months: {}, category: tx.category };
+    if (!merchantMonths[key].months[m]) merchantMonths[key].months[m] = 0;
+    merchantMonths[key].months[m] += tx.amount;
+  });
+
+  const recurring = [];
+  for (const [, info] of Object.entries(merchantMonths)) {
+    const mths = Object.keys(info.months).sort();
+    if (mths.length < 2) continue;
+    const amounts = Object.values(info.months);
+    const avg = amounts.reduce((a,b) => a+b, 0) / amounts.length;
+    const allSimilar = amounts.every(a => Math.abs(a - avg) / avg < 0.25);
+    if (allSimilar) {
+      recurring.push({ name: info.name, avgAmount: Math.round(avg), months: mths.length, category: info.category });
+    }
+  }
+  recurring.sort((a,b) => b.avgAmount - a.avgAmount);
+
+  const totalRecurring = recurring.reduce((s, r) => s + r.avgAmount, 0);
+  document.getElementById('recurringTotal').innerHTML = recurring.length > 0 ? `
+    <div class="forecast-box">
+      <div class="f-label">${lang==='he'?'סה"כ הוצאות קבועות חודשיות':'Total Monthly Fixed Expenses'}</div>
+      <div class="f-value">${fmtILS(totalRecurring)}</div>
+    </div>` : '';
+
+  if (recurring.length === 0) {
+    document.getElementById('recurringList').innerHTML = `<div class="empty-state"><p>${lang==='he'?'לא זוהו הוצאות חוזרות':'No recurring expenses detected'}</p></div>`;
+    return;
+  }
+
+  document.getElementById('recurringList').innerHTML = recurring.map(r => {
+    const cat = CATEGORIES[r.category] || CATEGORIES.other;
+    return `<div class="recurring-item">
+      <div class="r-icon">${cat.icon}</div>
+      <div class="r-info"><div class="r-name">${esc(r.name)}</div><div class="r-detail">${r.months} ${lang==='he'?'חודשים':'months'} | ${cat[lang]}</div></div>
+      <div class="r-amount">${fmtILS(r.avgAmount)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ===== LEARNED RULES VIEWER =====
+function renderLearnedRules() {
+  const el = document.getElementById('learnedRulesContent');
+  const countEl = document.getElementById('learnedCount');
+  if (!el) return;
+  const entries = Object.entries(learnedCats);
+  countEl.textContent = entries.length;
+  if (entries.length === 0) {
+    el.innerHTML = `<p style="color:var(--text2);padding:8px;">${lang==='he'?'אין כללים נלמדים עדיין. שנה קטגוריה של עסקה כדי שהמערכת תלמד.':'No learned rules yet. Change a transaction category to teach the system.'}</p>`;
+    return;
+  }
+  const sorted = entries.sort((a,b) => a[0].localeCompare(b[0]));
+  el.innerHTML = `<table class="delta-table"><thead><tr>
+    <th>${lang==='he'?'סוחר':'Merchant'}</th>
+    <th>${lang==='he'?'קטגוריה':'Category'}</th>
+    <th></th></tr></thead><tbody>` +
+    sorted.map(([m, cat]) => {
+      const c = CATEGORIES[cat] || CATEGORIES.other;
+      return `<tr><td>${esc(m)}</td><td>${c.icon} ${c[lang]}</td><td><button onclick="deleteLearnedRule('${esc(m.replace(/'/g,"\\'"))}')" class="btn btn-secondary" style="padding:2px 8px;font-size:0.8em;">✕</button></td></tr>`;
+    }).join('') + `</tbody></table>`;
+}
+async function deleteLearnedRule(merchant) {
+  delete learnedCats[merchant];
+  await saveData();
+  renderLearnedRules();
+  showToast(lang==='he'?'כלל נמחק':'Rule deleted','ok');
+}
+
+// ===== COMPARE =====
+function renderCompare() {
+  const m1 = document.getElementById('compareMonth1').value;
+  const m2 = document.getElementById('compareMonth2').value;
+  if (!m1 || !m2) return;
+  const tx1 = transactions.filter(tx => tx.date?.startsWith(m1));
+  const tx2 = transactions.filter(tx => tx.date?.startsWith(m2));
+  const cats = new Set();
+  const data1 = {}, data2 = {};
+  tx1.forEach(tx => { data1[tx.category] = (data1[tx.category]||0) + tx.amount; cats.add(tx.category); });
+  tx2.forEach(tx => { data2[tx.category] = (data2[tx.category]||0) + tx.amount; cats.add(tx.category); });
+  const sortedCats = [...cats].sort((a,b) => ((data1[b]||0)+(data2[b]||0)) - ((data1[a]||0)+(data2[a]||0)));
+  destroyChart('chartCompare');
+  chartInstances['chartCompare'] = new Chart(document.getElementById('chartCompare'), {
+    type: 'bar',
+    data: { labels: sortedCats.map(c => `${CATEGORIES[c]?.icon||''} ${CATEGORIES[c]?.[lang]||c}`),
+      datasets: [
+        { label: m1, data: sortedCats.map(c => Math.round(data1[c]||0)), backgroundColor: '#6366f1', borderRadius: 4 },
+        { label: m2, data: sortedCats.map(c => Math.round(data2[c]||0)), backgroundColor: '#34d399', borderRadius: 4 }
+      ] },
+    options: { responsive: true, plugins: { legend: { labels: { color: '#e4e4e7' } } }, scales: { x: { ticks: { color: '#b0b7c3' }, grid: { display: false } }, y: { ticks: { color: '#b0b7c3', callback: v => '₪'+v.toLocaleString() }, grid: { color: '#2e3347' } } } }
+  });
+  const total1 = tx1.reduce((s,tx)=>s+tx.amount,0);
+  const total2 = tx2.reduce((s,tx)=>s+tx.amount,0);
+  const diff = total1 - total2;
+  const pctChange = total2 > 0 ? ((diff / total2) * 100).toFixed(1) : 0;
+  document.getElementById('compareDetails').innerHTML = `
+    <div class="stats-row">
+      <div class="stat-card"><div class="label">${esc(m1)}</div><div class="value expense">${fmtILS(total1)}</div></div>
+      <div class="stat-card"><div class="label">${esc(m2)}</div><div class="value expense">${fmtILS(total2)}</div></div>
+      <div class="stat-card"><div class="label">${lang==='he'?'הפרש':'Difference'}</div><div class="value ${diff > 0 ? 'expense' : 'budget'}">${diff > 0 ? '+' : ''}${fmtILS(diff)} (${pctChange}%)</div></div>
+    </div>`;
+}
+
+// ===== EXPORT CSV (Fix — CSV injection protection) =====
+function exportCSV() {
+  const txs = getFilteredTx();
+  const header = 'Date,Merchant,Amount,Category,Source\n';
+  const safeCSV = s => { const str = String(s); return /[,"\n\r]/.test(str) || /^[=+\-@\t\r]/.test(str) ? '"' + "'" + str.replace(/"/g,'""') + '"' : str; };
+  const rows = txs.map(tx => `${tx.date},${safeCSV(tx.merchant)},${tx.amount.toFixed(2)},${safeCSV(CATEGORIES[tx.category]?.[lang]||tx.category)},${tx.source}`).join('\n');
+  const blob = new Blob(['﻿' + header + rows], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `expenses_${new Date().toISOString().substring(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  showToast(lang==='he' ? 'CSV יוצא בהצלחה!' : 'CSV exported!');
+}
+
+// ===== SAMPLE DATA =====
+async function loadSampleData() {
+  const now = new Date();
+  const cm = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const pm = now.getMonth() === 0 ? `${now.getFullYear()-1}-12` : `${now.getFullYear()}-${String(now.getMonth()).padStart(2,'0')}`;
+  const pp = now.getMonth() <= 1 ? `${now.getFullYear()-1}-${String(now.getMonth()===0?11:now.getMonth()-1).padStart(2,'0')}` : `${now.getFullYear()}-${String(now.getMonth()-1).padStart(2,'0')}`;
+  const sampleMerchants = [
+    { m: 'שופרסל דיל', cat: 'supermarket', min: 80, max: 450 },
+    { m: 'רמי לוי', cat: 'supermarket', min: 100, max: 600 },
+    { m: 'סונול - תחנת דלק', cat: 'fuel', min: 150, max: 350 },
+    { m: 'ארומה תל אביב', cat: 'restaurants', min: 25, max: 80 },
+    { m: 'מקדונלדס', cat: 'restaurants', min: 40, max: 120 },
+    { m: 'H&M ישראל', cat: 'clothing', min: 80, max: 300 },
+    { m: 'סופר פארם', cat: 'health', min: 30, max: 200 },
+    { m: 'Netflix', cat: 'subscriptions', min: 50, max: 50 },
+    { m: 'Spotify', cat: 'subscriptions', min: 30, max: 30 },
+    { m: 'Amazon.com', cat: 'online', min: 50, max: 500 },
+    { m: 'חברת חשמל', cat: 'bills', min: 200, max: 500 },
+    { m: 'בזק בינלאומי', cat: 'bills', min: 100, max: 150 },
+    { m: 'IKEA', cat: 'home', min: 100, max: 800 },
+    { m: 'יס פלאנט', cat: 'entertainment', min: 40, max: 80 },
+    { m: 'רכבת ישראל', cat: 'transport', min: 20, max: 50 },
+    { m: 'Wolt', cat: 'restaurants', min: 50, max: 150 },
+    { m: 'תן ביס', cat: 'restaurants', min: 30, max: 80 },
+    { m: 'Bit - העברה', cat: 'transfers', min: 50, max: 300 },
+  ];
+  const sources = ['isracard', 'max', 'cal'];
+  const sample = [];
+  for (const month of [pp, pm, cm]) {
+    const [y, mo] = month.split('-').map(Number);
+    const daysInMonth = new Date(y, mo, 0).getDate();
+    const numTx = 25 + Math.floor(Math.random() * 15);
+    for (let i = 0; i < numTx; i++) {
+      const merch = sampleMerchants[Math.floor(Math.random() * sampleMerchants.length)];
+      const day = 1 + Math.floor(Math.random() * Math.min(daysInMonth, month === cm ? now.getDate() : daysInMonth));
+      sample.push({ date: `${month}-${String(day).padStart(2,'0')}`, merchant: merch.m, amount: Math.round((merch.min + Math.random() * (merch.max - merch.min)) * 100) / 100, category: merch.cat, source: sources[Math.floor(Math.random() * sources.length)], id: Date.now() + Math.random() });
+    }
+  }
+  const { unique } = deduplicateNew(sample);
+  transactions = transactions.concat(unique);
+  await saveData(); refreshAll();
+  showToast(lang==='he' ? `נטענו ${unique.length} עסקאות דוגמה` : `Loaded ${unique.length} sample transactions`);
+}
+
+// ===== COFFEE MORNING MODE — WATCHED FOLDER (Step 2) =====
+let watchedDirHandle = null;
+const processedFiles = new Set(JSON.parse(localStorage.getItem('expenseIL_processedFiles') || '[]'));
+
+function isFileSystemAccessSupported() {
+  return 'showDirectoryPicker' in window;
+}
+
+async function pickWatchedFolder() {
+  if (!isFileSystemAccessSupported()) {
+    document.getElementById('watchedFolderUnsupported').style.display = 'block';
+    return;
+  }
+  try {
+    watchedDirHandle = await window.showDirectoryPicker({ mode: 'read' });
+    document.getElementById('btnScanFolder').style.display = '';
+    document.getElementById('btnClearFolder').style.display = '';
+    document.getElementById('watchedFolderStatus').innerHTML =
+      `<span style="color:var(--green);">📁 ${esc(watchedDirHandle.name)}</span>`;
+    await scanWatchedFolder();
+  } catch (e) {
+    if (e.name !== 'AbortError') {
+      showToast(lang==='he' ? 'שגיאה בבחירת תיקייה' : 'Error picking folder', 'error');
+    }
+  }
+}
+
+async function scanWatchedFolder() {
+  if (!watchedDirHandle) return;
+
+  // Verify permission still valid
+  const perm = await watchedDirHandle.queryPermission({ mode: 'read' });
+  if (perm !== 'granted') {
+    const req = await watchedDirHandle.requestPermission({ mode: 'read' });
+    if (req !== 'granted') {
+      showToast(lang==='he' ? 'אין הרשאה לתיקייה' : 'No folder permission', 'warn');
+      return;
+    }
+  }
+
+  autoBackupBeforeImport();
+  const log = document.getElementById('watchedFolderLog');
+  let newCount = 0, skipCount = 0, errorCount = 0;
+
+  for await (const entry of watchedDirHandle.values()) {
+    if (entry.kind !== 'file') continue;
+    const name = entry.name;
+    const ext = name.split('.').pop().toLowerCase();
+    if (ext !== 'csv' && ext !== 'tsv' && ext !== 'xlsx' && ext !== 'xls') continue;
+
+    // Skip already processed files (by name + lastModified)
+    const file = await entry.getFile();
+    const fileKey = `${name}|${file.lastModified}`;
+    if (processedFiles.has(fileKey)) { skipCount++; continue; }
+
+    try {
+      let rows, source;
+
+      if (ext === 'xlsx' || ext === 'xls') {
+        // XLSX parsing
+        const buf = await file.arrayBuffer();
+        rows = parseXLSX(buf, name);
+        if (!rows || rows.length === 0) {
+          addImportLog('warn', name, lang==='he'?'לא נמצאו עסקאות':'No transactions found');
+          errorCount++;
+          continue;
+        }
+        const headers = Object.keys(rows[0]).filter(k => k !== '__xlsxSource');
+        source = rows[0].__xlsxSource || detectSource(headers);
+        rows.forEach(r => delete r.__xlsxSource);
+      } else {
+        // CSV/TSV parsing
+        const text = await file.text();
+        const result = Papa.parse(text, { header: true, skipEmptyLines: true });
+        if (!result.data || result.data.length === 0) {
+          addImportLog('warn', name, lang==='he'?'קובץ ריק':'Empty file');
+          errorCount++;
+          continue;
+        }
+        rows = result.data;
+        const fields = result.meta.fields || [];
+        source = detectSource(fields);
+        const validation = validateColumns(fields, source);
+        if (!validation.ok) {
+          addImportLog('warn', name, validation.reason);
+          errorCount++;
+          continue;
+        }
+      }
+
+      const newTx = normalizeRows(rows, source);
+      const { unique, dupes, converted } = deduplicateNew(newTx);
+      transactions = transactions.concat(unique);
+
+      processedFiles.add(fileKey);
+      addImportLog('success', name, `${unique.length} imported, ${dupes} dupes, ${converted} converted [${source}]`);
+      newCount += unique.length;
+    } catch (err) {
+      addImportLog('error', name, err.message);
+      errorCount++;
+    }
+  }
+
+  // Persist processed file list
+  localStorage.setItem('expenseIL_processedFiles', JSON.stringify([...processedFiles]));
+
+  if (newCount > 0) {
+    await saveData();
+    refreshAll();
+  }
+
+  renderImportLog();
+
+  // Summary toast
+  const statusEl = document.getElementById('watchedFolderStatus');
+  const now = new Date().toLocaleTimeString('he-IL');
+  let summary = `📁 ${esc(watchedDirHandle.name)} — `;
+  summary += lang==='he'
+    ? `סריקה אחרונה: ${now} | ${newCount} חדשות, ${skipCount} כבר יובאו`
+    : `Last scan: ${now} | ${newCount} new, ${skipCount} already imported`;
+  if (errorCount > 0) summary += lang==='he' ? `, ${errorCount} שגיאות` : `, ${errorCount} errors`;
+  statusEl.innerHTML = `<span style="color:var(--green);">${summary}</span>`;
+
+  if (newCount > 0) {
+    showToast(lang==='he' ? `☕ ${newCount} עסקאות חדשות יובאו מהתיקייה!` : `☕ ${newCount} new transactions imported from folder!`, 'success');
+  } else {
+    showToast(lang==='he' ? '☕ אין קבצים חדשים בתיקייה' : '☕ No new files in folder', 'success');
+  }
+}
+
+function clearWatchedFolder() {
+  watchedDirHandle = null;
+  document.getElementById('btnScanFolder').style.display = 'none';
+  document.getElementById('btnClearFolder').style.display = 'none';
+  document.getElementById('watchedFolderStatus').innerHTML = '';
+  document.getElementById('watchedFolderLog').innerHTML = '';
+}
+
+// Check File System Access support on load
+if (!isFileSystemAccessSupported()) {
+  document.getElementById('watchedFolderUnsupported').style.display = 'block';
+  document.getElementById('btnPickFolder').disabled = true;
+  document.getElementById('btnPickFolder').style.opacity = '0.5';
+}
+
+// ===== LANGUAGE =====
+async function toggleLang() {
+  lang = lang === 'he' ? 'en' : 'he';
+  document.documentElement.dir = lang === 'he' ? 'rtl' : 'ltr';
+  document.documentElement.lang = lang;
+  await saveData(); applyLang(); refreshAll();
+}
+function applyLang() {
+  document.querySelectorAll('.t').forEach(el => { if (el.dataset[lang]) el.textContent = el.dataset[lang]; });
+  document.getElementById('securityText').textContent = lang === 'he'
+    ? 'כל הנתונים מוצפנים על המכשיר שלך. בסנכרון ענן — רק נתונים מוצפנים נשלחים (AES-256).'
+    : 'All data is encrypted on your device. Cloud sync sends only encrypted data (AES-256).';
+}
+
+// ===== PIN INPUT ENTER KEY =====
+document.getElementById('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') handlePin(); });
+
+// ===== INIT =====
+(async function init() {
+  if (isEncrypted) {
+    showPinScreen('unlock');
+  } else {
+    document.getElementById('mainApp').style.display = 'block';
+    await loadData();
+    if (transactions.length === 0 && !localStorage.getItem('expenseIL_pinOffered')) {
+      localStorage.setItem('expenseIL_pinOffered', '1');
+      showPinScreen('setup');
+    } else {
+      enterApp();
+    }
+  }
+})();
+
+// ===== FIREBASE SYNC =====
+const firebaseConfig = {
+  apiKey: "AIzaSyDmqx91P_mo8BxfuUrryEBqygo2T8O4ZwM",
+  authDomain: "expenseil.firebaseapp.com",
+  databaseURL: "https://expenseil-default-rtdb.firebaseio.com",
+  projectId: "expenseil",
+  storageBucket: "expenseil.firebasestorage.app",
+  messagingSenderId: "1032073222192",
+  appId: "1:1032073222192:web:ad21d0362c59b15bd3b5f5"
+};
+
+let firebaseUser = null;
+let syncEnabled = false;
+
+// Init Firebase
+try {
+  firebase.initializeApp(firebaseConfig);
+} catch(e) { console.warn('Firebase init failed:', e); }
+
+function updateSyncUI() {
+  const btn = document.getElementById('syncBtn');
+  const label = document.getElementById('syncLabel');
+  btn.style.display = '';
+  if (firebaseUser) {
+    label.textContent = lang==='he' ? 'מסונכרן ☁️' : 'Synced ☁️';
+    btn.style.background = 'var(--green)';
+    btn.title = firebaseUser.email || firebaseUser.displayName || 'Synced';
+  } else {
+    label.textContent = lang==='he' ? '☁️ סנכרון בין מכשירים' : '☁️ Sync Devices';
+    btn.style.background = 'var(--accent2)';
+    btn.title = lang==='he' ? 'התחבר עם Google לסנכרון בין מכשירים' : 'Sign in with Google to sync across devices';
+  }
+}
+
+async function handleSyncClick() {
+  if (firebaseUser) {
+    // Already signed in — offer sign out
+    if (confirm(lang==='he'
+      ? `מחובר כ-${firebaseUser.email}\nלהתנתק?`
+      : `Signed in as ${firebaseUser.email}\nSign out?`)) {
+      await firebase.auth().signOut();
+    }
+    return;
+  }
+  // Check PIN first — if no PIN set, prompt to create one
+  if (!cryptoKey) {
+    if (!localStorage.getItem('expIL_enc')) {
+      // No encrypted data at all — need to set up PIN first
+      showPinScreen('setup');
+      showToast(lang==='he' ? 'הגדר קוד PIN קודם — הוא נדרש לסנכרון מאובטח' : 'Set a PIN first — required for secure sync', 'warn');
+    } else {
+      // Encrypted data exists but not unlocked — show unlock screen
+      showPinScreen('unlock');
+      showToast(lang==='he' ? 'הזן קוד PIN כדי לפתוח ולסנכרן' : 'Enter PIN to unlock and sync', 'warn');
+    }
+    return;
+  }
+  // Sign in with Google popup
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await firebase.auth().signInWithPopup(provider);
+  } catch(e) {
+    if (e.code !== 'auth/popup-closed-by-user') {
+      const msg = e.code === 'auth/unauthorized-domain'
+        ? (lang==='he' ? 'הדומיין לא מאושר בפיירבייס — פתח את האפליקציה מ-GitHub Pages' : 'Domain not authorized in Firebase — open app from GitHub Pages')
+        : (lang==='he' ? 'שגיאה בהתחברות: ' + e.message : 'Sign-in error: ' + e.message);
+      showToast(msg, 'error');
+      console.error('Auth error:', e);
+    }
+  }
+}
+
+// Push encrypted data to Firebase
+async function pushToCloud() {
+  if (!firebaseUser || !cryptoKey) return;
+  try {
+    const data = { tx: transactions, budgets, learnedCats };
+    const encrypted = await encryptData(data, cryptoKey);
+    const payload = {
+      data: JSON.stringify(encrypted),
+      ts: firebase.database.ServerValue.TIMESTAMP,
+      device: navigator.userAgent.substring(0, 60)
+    };
+    await firebase.database().ref('users/' + firebaseUser.uid + '/expenses').set(payload);
+  } catch(e) {
+    console.warn('Cloud push failed:', e);
+  }
+}
+
+// Pull encrypted data from Firebase and merge if newer
+async function pullFromCloud() {
+  if (!firebaseUser || !cryptoKey) return false;
+  try {
+    const snap = await firebase.database().ref('users/' + firebaseUser.uid + '/expenses').once('value');
+    const val = snap.val();
+    if (!val || !val.data) return false;
+    const encrypted = JSON.parse(val.data);
+    const cloudData = await decryptData(encrypted, cryptoKey);
+    if (!cloudData) {
+      // Wrong PIN for cloud data — skip silently
+      return false;
+    }
+    const cloudTx = cloudData.tx || [];
+    if (cloudTx.length === 0 && transactions.length > 0) return false;
+
+    // Merge: union by dedupKey or ref
+    const localKeys = new Set(transactions.map(t => t.dedupKey || t.ref || `${t.date}_${t.merchant}_${t.amount}`));
+    let merged = [...transactions];
+    let added = 0;
+    for (const ct of cloudTx) {
+      const key = ct.dedupKey || ct.ref || `${ct.date}_${ct.merchant}_${ct.amount}`;
+      if (!localKeys.has(key)) {
+        merged.push(ct);
+        localKeys.add(key);
+        added++;
+      }
+    }
+    // Merge budgets (cloud wins for conflicts)
+    const mergedBudgets = { ...budgets, ...cloudData.budgets };
+    // Merge learned categories (cloud wins)
+    const mergedLearned = { ...learnedCats, ...cloudData.learnedCats };
+
+    if (added > 0 || Object.keys(cloudData.budgets||{}).length > Object.keys(budgets).length) {
+      transactions = merged;
+      budgets = mergedBudgets;
+      learnedCats = mergedLearned;
+      await saveData();
+      refreshAll();
+      if (added > 0) {
+        showToast(lang==='he' ? `☁️ ${added} עסקאות סונכרנו מהענן` : `☁️ ${added} transactions synced from cloud`, 'success');
+      }
+      return true;
+    }
+    // Even if no new tx, update budgets/learned if different
+    budgets = mergedBudgets;
+    learnedCats = mergedLearned;
+    return false;
+  } catch(e) {
+    console.warn('Cloud pull failed:', e);
+    return false;
+  }
+}
+
+// Listen for auth state changes
+firebase.auth().onAuthStateChanged(async (user) => {
+  firebaseUser = user;
+  syncEnabled = !!user;
+  updateSyncUI();
+  if (user && cryptoKey) {
+    // Pull cloud data on sign-in
+    await pullFromCloud();
+    // Push local data to cloud (ensures cloud has latest)
+    await pushToCloud();
+  }
+});
+
+// ===== SERVICE WORKER =====
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מדריך שימוש — ExpenseIL</title>
+<style>
+  @media print {
+    body { font-size: 11pt; }
+    .page-break { page-break-before: always; }
+    .no-print { display: none; }
+    .toc a { text-decoration: none; color: #333; }
+  }
+  :root {
+    --primary: #6366f1;
+    --primary-light: #e0e7ff;
+    --bg: #ffffff;
+    --text: #1e293b;
+    --text2: #64748b;
+    --border: #e2e8f0;
+    --surface: #f8fafc;
+    --green: #10b981;
+    --orange: #f59e0b;
+    --red: #ef4444;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.7; direction: rtl; padding: 0;
+  }
+  .container { max-width: 800px; margin: 0 auto; padding: 40px 32px; }
+
+  /* Cover */
+  .cover {
+    text-align: center; padding: 80px 32px 60px;
+    background: linear-gradient(135deg, #6366f1 0%, #818cf8 50%, #a78bfa 100%);
+    color: white; border-radius: 0 0 40px 40px; margin-bottom: 40px;
+  }
+  .cover .logo { font-size: 4em; margin-bottom: 16px; }
+  .cover h1 { font-size: 2.4em; margin-bottom: 8px; font-weight: 800; }
+  .cover .subtitle { font-size: 1.2em; opacity: 0.9; margin-bottom: 24px; }
+  .cover .version { font-size: 0.9em; opacity: 0.7; }
+
+  /* TOC */
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px 32px; margin-bottom: 40px; }
+  .toc h2 { font-size: 1.3em; margin-bottom: 16px; color: var(--primary); }
+  .toc ol { padding-right: 24px; }
+  .toc li { margin-bottom: 8px; }
+  .toc a { color: var(--text); text-decoration: none; }
+  .toc a:hover { color: var(--primary); }
+
+  /* Sections */
+  h2 {
+    font-size: 1.5em; color: var(--primary); margin: 48px 0 16px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--primary-light);
+  }
+  h3 { font-size: 1.15em; color: var(--text); margin: 28px 0 12px; }
+  h4 { font-size: 1em; color: var(--text2); margin: 20px 0 8px; }
+  p { margin-bottom: 12px; }
+  ul, ol { padding-right: 24px; margin-bottom: 12px; }
+  li { margin-bottom: 6px; }
+
+  /* Callouts */
+  .tip, .warning, .info, .security {
+    border-radius: 12px; padding: 16px 20px; margin: 16px 0;
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .tip { background: #ecfdf5; border-right: 4px solid var(--green); }
+  .warning { background: #fffbeb; border-right: 4px solid var(--orange); }
+  .info { background: #eff6ff; border-right: 4px solid #3b82f6; }
+  .security { background: #fef2f2; border-right: 4px solid var(--red); }
+  .callout-icon { font-size: 1.3em; flex-shrink: 0; }
+  .callout-text { flex: 1; }
+  .callout-text strong { display: block; margin-bottom: 4px; }
+
+  /* Steps */
+  .steps { counter-reset: step; margin: 16px 0; }
+  .step {
+    display: flex; gap: 16px; margin-bottom: 16px;
+    background: var(--surface); border-radius: 12px; padding: 16px 20px;
+    border: 1px solid var(--border);
+  }
+  .step::before {
+    counter-increment: step;
+    content: counter(step);
+    background: var(--primary); color: white;
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.9em; flex-shrink: 0;
+  }
+  .step-content { flex: 1; }
+
+  /* Keyboard */
+  kbd {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 4px; padding: 2px 6px; font-family: monospace;
+    font-size: 0.9em;
+  }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.95em; }
+  th { background: var(--primary-light); color: var(--primary); text-align: right; padding: 10px 14px; font-weight: 600; }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  tr:hover { background: var(--surface); }
+
+  /* Feature card */
+  .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 16px 0; }
+  .feature-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; text-align: center;
+  }
+  .feature-card .icon { font-size: 2em; margin-bottom: 8px; }
+  .feature-card .name { font-weight: 600; margin-bottom: 4px; }
+  .feature-card .desc { font-size: 0.85em; color: var(--text2); }
+
+  /* Screenshot placeholder */
+  .screenshot {
+    background: linear-gradient(135deg, #1a1d27, #242836);
+    border-radius: 12px; padding: 20px; margin: 16px 0;
+    color: #e4e4e7; text-align: center; font-size: 0.9em;
+    border: 1px solid #2e3347;
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center; padding: 32px; margin-top: 60px;
+    border-top: 1px solid var(--border); color: var(--text2); font-size: 0.85em;
+  }
+</style>
+</head>
+<body>
+
+<!-- ========== COVER ========== -->
+<div class="cover">
+  <div class="logo">💰</div>
+  <h1>ExpenseIL</h1>
+  <div class="subtitle">מדריך שימוש מלא — מעקב הוצאות לכרטיסי אשראי ישראליים</div>
+  <div class="version">גרסה 1.0 · מאי 2026</div>
+</div>
+
+<div class="container">
+
+<!-- ========== TOC ========== -->
+<div class="toc" id="toc">
+  <h2>📋 תוכן עניינים</h2>
+  <ol>
+    <li><a href="#intro">מה זה ExpenseIL?</a></li>
+    <li><a href="#start">התחלת עבודה</a></li>
+    <li><a href="#pin">הגדרת קוד PIN ואבטחה</a></li>
+    <li><a href="#import">ייבוא נתונים מכרטיסי אשראי</a></li>
+    <li><a href="#download-csv">איך מורידים קובץ CSV מחברת האשראי?</a></li>
+    <li><a href="#manual">הוספת עסקה ידנית</a></li>
+    <li><a href="#dashboard">לוח מחוונים (Dashboard)</a></li>
+    <li><a href="#transactions">עסקאות — חיפוש, סינון וייצוא</a></li>
+    <li><a href="#budget">תקציב חודשי</a></li>
+    <li><a href="#recurring">הוצאות קבועות</a></li>
+    <li><a href="#compare">השוואת חודשים</a></li>
+    <li><a href="#coffee">מצב בוקר קפה ☕ (תיקייה נצפית)</a></li>
+    <li><a href="#backup">גיבוי ושחזור</a></li>
+    <li><a href="#security">אבטחה ופרטיות</a></li>
+    <li><a href="#faq">שאלות נפוצות</a></li>
+  </ol>
+</div>
+
+<!-- ========== 1. INTRO ========== -->
+<h2 id="intro">1. מה זה ExpenseIL?</h2>
+<p>
+  ExpenseIL היא אפליקציית מעקב הוצאות שנבנתה במיוחד עבור כרטיסי אשראי ישראליים.
+  האפליקציה רצה <strong>לחלוטין על המחשב שלך</strong> — בלי שרתים, בלי ענן, בלי רישום.
+  פשוט פותחים את הקובץ בדפדפן ומתחילים.
+</p>
+
+<div class="feature-grid">
+  <div class="feature-card">
+    <div class="icon">🏦</div>
+    <div class="name">3 חברות אשראי</div>
+    <div class="desc">ישראכרט · מקס · כאל</div>
+  </div>
+  <div class="feature-card">
+    <div class="icon">🔐</div>
+    <div class="name">הצפנת AES-256</div>
+    <div class="desc">כל המידע מוצפן על המכשיר</div>
+  </div>
+  <div class="feature-card">
+    <div class="icon">📊</div>
+    <div class="name">4 סוגי גרפים</div>
+    <div class="desc">דונאט · עמודות · עוגה · קו</div>
+  </div>
+  <div class="feature-card">
+    <div class="icon">🏷️</div>
+    <div class="name">16 קטגוריות</div>
+    <div class="desc">מיון אוטומטי חכם</div>
+  </div>
+  <div class="feature-card">
+    <div class="icon">☕</div>
+    <div class="name">מצב בוקר קפה</div>
+    <div class="desc">ייבוא אוטומטי מתיקייה</div>
+  </div>
+  <div class="feature-card">
+    <div class="icon">🌐</div>
+    <div class="name">דו-לשוני</div>
+    <div class="desc">עברית ואנגלית</div>
+  </div>
+</div>
+
+<!-- ========== 2. START ========== -->
+<h2 id="start">2. התחלת עבודה</h2>
+<p>לא צריך להתקין כלום. האפליקציה היא קובץ HTML בודד.</p>
+
+<div class="steps">
+  <div class="step">
+    <div class="step-content">
+      <strong>אתרו את הקובץ</strong>
+      <p>מצאו את הקובץ <kbd>expense-tracker.html</kbd> במחשב שלכם.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-content">
+      <strong>פתחו בדפדפן</strong>
+      <p>לחצו עליו דאבל-קליק — הוא ייפתח בדפדפן (Chrome, Edge, Firefox). מומלץ Chrome.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-content">
+      <strong>הגדירו PIN (אופציונלי)</strong>
+      <p>במסך הראשון תוכלו להגדיר קוד PIN להגנה על המידע, או לדלג.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-content">
+      <strong>ייבאו נתונים</strong>
+      <p>עברו ללשונית "ייבוא" וגררו קובץ CSV מחברת האשראי שלכם.</p>
+    </div>
+  </div>
+</div>
+
+<div class="tip">
+  <span class="callout-icon">💡</span>
+  <div class="callout-text">
+    <strong>טיפ</strong>
+    אפשר ליצור קיצור דרך על שולחן העבודה לקובץ — ככה תפתחו אותו בלחיצה אחת בכל בוקר.
+  </div>
+</div>
+
+<!-- ========== 3. PIN ========== -->
+<h2 id="pin">3. הגדרת קוד PIN ואבטחה</h2>
+<p>
+  בפעם הראשונה שפותחים את האפליקציה, מוצג מסך הגדרת PIN. ה-PIN משמש להצפנת כל המידע הפיננסי שלכם על המכשיר.
+</p>
+
+<h3>הגדרת PIN חדש</h3>
+<div class="steps">
+  <div class="step">
+    <div class="step-content">
+      <strong>הזינו קוד PIN</strong>
+      <p>לפחות 4 תווים. יכול להכיל מספרים, אותיות ותווים מיוחדים.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-content">
+      <strong>לחצו "הגדר PIN"</strong>
+      <p>הקוד יישמר בצורה מוצפנת (hash) ב-localStorage של הדפדפן.</p>
+    </div>
+  </div>
+</div>
+
+<h3>שימוש יומיומי</h3>
+<ul>
+  <li><strong>פתיחת האפליקציה:</strong> כשפותחים את הקובץ, מוצג מסך נעילה — הזינו את ה-PIN כדי להיכנס.</li>
+  <li><strong>נעילה ידנית:</strong> לחצו על כפתור 🔒 בפינה העליונה כדי לנעול מיידית.</li>
+  <li><strong>דילוג:</strong> אפשר ללחוץ "דלג" ולהשתמש בלי PIN — אבל המידע לא יהיה מוצפן.</li>
+</ul>
+
+<div class="security">
+  <span class="callout-icon">🔑</span>
+  <div class="callout-text">
+    <strong>חשוב — אין שחזור PIN!</strong>
+    אם שכחתם את ה-PIN, אין דרך לשחזר אותו. תצטרכו לנקות את הנתונים ולהתחיל מחדש.
+    שמרו את ה-PIN במקום בטוח.
+  </div>
+</div>
+
+<!-- ========== 4. IMPORT ========== -->
+<h2 id="import">4. ייבוא נתונים מכרטיסי אשראי</h2>
+<p>האפליקציה תומכת בייבוא קבצי CSV מ-3 חברות האשראי הגדולות בישראל:</p>
+
+<table>
+  <thead>
+    <tr><th>חברה</th><th>שם באפליקציה</th><th>עמודות נדרשות</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>🟦 ישראכרט</td><td>isracard</td><td>תאריך עסקה, שם בית עסק, סכום חיוב</td></tr>
+    <tr><td>🟥 מקס (לאומי קארד)</td><td>max</td><td>תאריך עסקה, שם בית העסק, סכום חיוב</td></tr>
+    <tr><td>🟨 כאל (ויזה כאל)</td><td>cal</td><td>תאריך עסקה, שם בית עסק, סכום חיוב</td></tr>
+  </tbody>
+</table>
+
+<h3>איך מייבאים?</h3>
+<div class="steps">
+  <div class="step">
+    <div class="step-content">
+      <strong>עברו ללשונית "ייבוא"</strong>
+      <p>הלשונית האחרונה בתפריט העליון.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-content">
+      <strong>גררו קובץ CSV לאזור הייבוא</strong>
+      <p>או לחצו על אזור הייבוא כדי לבחור קובץ מהמחשב.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-content">
+      <strong>האפליקציה מזהה אוטומטית</strong>
+      <p>חברת האשראי מזוהה לפי שמות העמודות בקובץ. אם הזיהוי נכשל, תוצג הודעת שגיאה.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-content">
+      <strong>תוצאות הייבוא</strong>
+      <p>תוצג הודעה עם מספר העסקאות שיובאו וכמות כפילויות שסוננו.</p>
+    </div>
+  </div>
+</div>
+
+<div class="info">
+  <span class="callout-icon">🔄</span>
+  <div class="callout-text">
+    <strong>סינון כפילויות אוטומטי</strong>
+    אפשר לייבא את אותו קובץ פעמיים בלי חשש — המערכת מזהה כפילויות לפי מספר אסמכתא (כשקיים) או לפי תאריך + סוחר + סכום.
+  </div>
+</div>
+
+<!-- ========== 5. DOWNLOAD CSV ========== -->
+<h2 id="download-csv">5. איך מורידים קובץ CSV מחברת האשראי?</h2>
+
+<h3>🟦 ישראכרט (Isracard)</h3>
+<div class="steps">
+  <div class="step"><div class="step-content">היכנסו לאתר <strong>digital.isracard.co.il</strong></div></div>
+  <div class="step"><div class="step-content">עברו ל<strong>"פירוט חיובים"</strong> או <strong>"עסקאות"</strong></div></div>
+  <div class="step"><div class="step-content">בחרו את החודש הרצוי</div></div>
+  <div class="step"><div class="step-content">לחצו על <strong>"ייצוא לאקסל"</strong> או <strong>"הורדה"</strong> ובחרו פורמט CSV</div></div>
+</div>
+
+<h3>🟥 מקס (Max / לאומי קארד)</h3>
+<div class="steps">
+  <div class="step"><div class="step-content">היכנסו לאתר <strong>www.max.co.il</strong></div></div>
+  <div class="step"><div class="step-content">עברו ל<strong>"פירוט עסקאות"</strong></div></div>
+  <div class="step"><div class="step-content">בחרו חודש ולחצו <strong>"ייצוא"</strong> → CSV</div></div>
+</div>
+
+<h3>🟨 כאל (Cal / ויזה כאל)</h3>
+<div class="steps">
+  <div class="step"><div class="step-content">היכנסו לאתר <strong>www.cal-online.co.il</strong></div></div>
+  <div class="step"><div class="step-content">עברו ל<strong>"פירוט עסקאות"</strong> או <strong>"חשבון"</strong></div></div>
+  <div class="step"><div class="step-content">בחרו חודש ולחצו על <strong>כפתור ייצוא / הורדה ל-Excel</strong></div></div>
+</div>
+
+<div class="tip">
+  <span class="callout-icon">💡</span>
+  <div class="callout-text">
+    <strong>טיפ: שמרו בתיקייה אחת</strong>
+    צרו תיקייה ייעודית (למשל <kbd>הוצאות-CSV</kbd>) ושמרו בה את כל הקבצים שמורידים.
+    ככה תוכלו להשתמש ב"מצב בוקר קפה" לייבוא אוטומטי (ראו סעיף 12).
+  </div>
+</div>
+
+<!-- ========== 6. MANUAL ========== -->
+<h2 id="manual">6. הוספת עסקה ידנית</h2>
+<p>בנוסף לייבוא CSV, אפשר להוסיף עסקאות ידנית — שימושי למזומן, ביט, או עסקאות שלא מופיעות בכרטיס.</p>
+
+<div class="steps">
+  <div class="step">
+    <div class="step-content">
+      <strong>עברו ללשונית "ייבוא"</strong>
+      <p>גללו מטה לטופס "הוספת עסקה ידנית".</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-content">
+      <strong>מלאו את השדות</strong>
+      <p>תאריך, שם בית עסק, סכום, וקטגוריה (אופציונלי — אם לא תבחרו, המערכת תנסה לזהות אוטומטית).</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-content">
+      <strong>לחצו "הוסף"</strong>
+      <p>העסקה תתווסף מיד ותופיע בטבלת העסקאות ובדשבורד.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 7. DASHBOARD ========== -->
+<h2 id="dashboard">7. לוח מחוונים (Dashboard)</h2>
+<p>הלשונית הראשונה — מציגה תמונת מצב של ההוצאות בחודש הנוכחי.</p>
+
+<h3>שורת נתונים עליונה</h3>
+<table>
+  <thead><tr><th>כרטיס</th><th>מה מוצג</th></tr></thead>
+  <tbody>
+    <tr><td>💰 סה"כ חודשי</td><td>סכום כל ההוצאות בחודש הנוכחי</td></tr>
+    <tr><td>📋 מספר עסקאות</td><td>כמה עסקאות בוצעו החודש</td></tr>
+    <tr><td>📊 ממוצע לעסקה</td><td>סכום ממוצע לכל עסקה</td></tr>
+    <tr><td>🎯 נותר מתקציב</td><td>כמה נותר מהתקציב שהגדרתם (אם הוגדר)</td></tr>
+  </tbody>
+</table>
+
+<h3>תחזית סוף חודש</h3>
+<p>
+  מתחת לשורת הנתונים מוצגת תחזית — המערכת מחשבת ממוצע יומי ומכפילה במספר ימי החודש.
+  ככה תדעו מראש האם אתם בדרך לחריגה מהתקציב.
+</p>
+
+<h3>התראות תקציב</h3>
+<ul>
+  <li><strong>🟡 התראה צהובה (80%):</strong> הגעתם ל-80% מהתקציב — שימו לב.</li>
+  <li><strong>🔴 התראה אדומה (100%):</strong> חרגתם מהתקציב!</li>
+</ul>
+
+<h3>גרפים</h3>
+<p>הדשבורד מציג 4 גרפים:</p>
+<table>
+  <thead><tr><th>גרף</th><th>מה מוצג</th></tr></thead>
+  <tbody>
+    <tr><td>🍩 דונאט</td><td>התפלגות הוצאות לפי קטגוריה</td></tr>
+    <tr><td>📊 עמודות</td><td>הוצאות לפי חודש (מגמה)</td></tr>
+    <tr><td>🥧 עוגה</td><td>התפלגות לפי מקור (חברת אשראי)</td></tr>
+    <tr><td>📈 קו</td><td>הוצאות מצטברות לאורך החודש</td></tr>
+  </tbody>
+</table>
+
+<!-- ========== 8. TRANSACTIONS ========== -->
+<h2 id="transactions">8. עסקאות — חיפוש, סינון וייצוא</h2>
+<p>לשונית "עסקאות" מציגה את כל העסקאות בטבלה מפורטת.</p>
+
+<h3>סינון וחיפוש</h3>
+<ul>
+  <li><strong>חיפוש חופשי:</strong> הקלידו שם בית עסק, סכום, או כל מילה — הטבלה מסתננת בזמן אמת.</li>
+  <li><strong>סינון לפי חודש:</strong> בחרו חודש ספציפי מהרשימה.</li>
+  <li><strong>סינון לפי קטגוריה:</strong> בחרו קטגוריה (סופרמרקט, מסעדות, דלק...).</li>
+  <li><strong>סינון לפי מקור:</strong> בחרו חברת אשראי (ישראכרט / מקס / כאל / ידני).</li>
+</ul>
+
+<h3>עריכת קטגוריה</h3>
+<p>
+  המיון האוטומטי לא תמיד מושלם. לחצו על תג הקטגוריה של כל עסקה כדי לשנות אותה ידנית.
+  השינוי נשמר מיד.
+</p>
+
+<h3>מחיקת עסקה</h3>
+<p>לחצו על כפתור ❌ בשורת העסקה למחיקה. המחיקה מיידית ולא ניתנת לביטול.</p>
+
+<h3>ייצוא ל-CSV</h3>
+<p>
+  לחצו על כפתור <strong>"ייצוא CSV"</strong> כדי להוריד את כל העסקאות המוצגות (אחרי סינון) כקובץ CSV.
+  שימושי לגיבוי או ניתוח בגיליון אלקטרוני.
+</p>
+
+<!-- ========== 9. BUDGET ========== -->
+<h2 id="budget">9. תקציב חודשי</h2>
+<p>לשונית "תקציב" מאפשרת להגדיר תקציב חודשי לכל קטגוריה.</p>
+
+<div class="steps">
+  <div class="step">
+    <div class="step-content">
+      <strong>עברו ללשונית "תקציב"</strong>
+      <p>בחרו את החודש הרצוי בבורר בראש הדף.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-content">
+      <strong>הזינו סכומים</strong>
+      <p>ליד כל קטגוריה יש שדה קלט — הזינו את הסכום המקסימלי שאתם רוצים להוציא.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-content">
+      <strong>עקבו אחרי ההתקדמות</strong>
+      <p>מד התקדמות (progress bar) מראה כמה הוצאתם מתוך התקציב:</p>
+      <ul>
+        <li>🟢 <strong>ירוק</strong> — הכל בסדר (מתחת ל-80%)</li>
+        <li>🟡 <strong>צהוב</strong> — מתקרבים (80%-100%)</li>
+        <li>🔴 <strong>אדום</strong> — חריגה!</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="tip">
+  <span class="callout-icon">💡</span>
+  <div class="callout-text">
+    <strong>טיפ</strong>
+    אין חובה להגדיר תקציב לכל קטגוריה. הגדירו רק לקטגוריות שאתם רוצים לעקוב אחריהן.
+  </div>
+</div>
+
+<!-- ========== 10. RECURRING ========== -->
+<h2 id="recurring">10. הוצאות קבועות</h2>
+<p>
+  לשונית "הוצאות קבועות" מזהה אוטומטית עסקאות שחוזרות על עצמן מדי חודש —
+  כמו מנויים, ביטוחים, חוגים, ותשלומים.
+</p>
+
+<h3>איך הזיהוי עובד?</h3>
+<ul>
+  <li>המערכת מחפשת בתי עסק שמופיעים <strong>ב-2 חודשים שונים לפחות</strong>.</li>
+  <li>הסכום צריך להיות דומה (סטיית תקן של עד <strong>25%</strong>).</li>
+  <li>מוצג סכום ממוצע וסה"כ חודשי של כל ההוצאות הקבועות.</li>
+</ul>
+
+<div class="info">
+  <span class="callout-icon">ℹ️</span>
+  <div class="callout-text">
+    <strong>צריך מספיק נתונים</strong>
+    הזיהוי עובד רק כשיש לפחות 2 חודשים של היסטוריה. ייבאו כמה חודשים כדי לקבל תמונה מלאה.
+  </div>
+</div>
+
+<!-- ========== 11. COMPARE ========== -->
+<h2 id="compare">11. השוואת חודשים</h2>
+<p>
+  לשונית "השוואה" מאפשרת להשוות שני חודשים זה לזה — כדי לראות אם הוצאתם יותר או פחות, ובאילו קטגוריות.
+</p>
+
+<h3>איך משתמשים?</h3>
+<div class="steps">
+  <div class="step"><div class="step-content">בחרו שני חודשים מהרשימות הנפתחות.</div></div>
+  <div class="step"><div class="step-content">צפו בגרף עמודות מקובצות שמשווה את ההוצאות לפי קטגוריה.</div></div>
+  <div class="step"><div class="step-content">מתחת לגרף מוצגים נתוני ההפרש — סה"כ, מספר עסקאות, ושינוי באחוזים.</div></div>
+</div>
+
+<!-- ========== 12. COFFEE ========== -->
+<h2 id="coffee">12. מצב בוקר קפה ☕ (תיקייה נצפית)</h2>
+<p>
+  הפיצ'ר הכי נוח באפליקציה! בחרו תיקייה במחשב, והאפליקציה תסרוק אותה אוטומטית
+  ותייבא כל קובץ CSV חדש שתוסיפו לשם.
+</p>
+
+<h3>הגדרה ראשונית</h3>
+<div class="steps">
+  <div class="step">
+    <div class="step-content">
+      <strong>עברו ללשונית "ייבוא"</strong>
+      <p>גללו מטה לאזור "מצב בוקר קפה".</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-content">
+      <strong>לחצו "בחר תיקייה"</strong>
+      <p>הדפדפן יבקש הרשאה — בחרו את התיקייה שבה אתם שומרים קבצי CSV.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-content">
+      <strong>זהו!</strong>
+      <p>מעכשיו, כל פעם שתורידו קובץ חדש מאתר חברת האשראי ותשמרו אותו בתיקייה — הוא ייקלט אוטומטית.</p>
+    </div>
+  </div>
+</div>
+
+<h3>שימוש יומיומי</h3>
+<p>
+  בכל בוקר: פתחו את האפליקציה → לחצו "סרוק עכשיו" (או שהסריקה תרוץ אוטומטית).
+  קבצים שכבר יובאו לא ייובאו שוב — המערכת עוקבת אחרי קבצים שעובדו לפי שם ותאריך שינוי.
+</p>
+
+<div class="warning">
+  <span class="callout-icon">⚠️</span>
+  <div class="callout-text">
+    <strong>דורש הרשאת דפדפן</strong>
+    בפעם הראשונה, הדפדפן יבקש הרשאת גישה לתיקייה. לחצו "Allow" / "אפשר".
+    ייתכן שתצטרכו לאשר שוב אחרי סגירה מלאה של הדפדפן.
+    פיצ'ר זה זמין רק ב-Chrome ו-Edge (לא ב-Firefox).
+  </div>
+</div>
+
+<!-- ========== 13. BACKUP ========== -->
+<h2 id="backup">13. גיבוי ושחזור</h2>
+<p>המידע שלכם חשוב — האפליקציה מספקת כמה דרכים לגבות ולשחזר:</p>
+
+<h3>גיבוי אוטומטי</h3>
+<p>
+  לפני כל ייבוא CSV, המערכת יוצרת גיבוי אוטומטי ב-localStorage.
+  אם משהו משתבש, אפשר לשחזר את הגיבוי האחרון.
+</p>
+
+<h3>גיבוי ידני</h3>
+<div class="steps">
+  <div class="step">
+    <div class="step-content">
+      <strong>עברו ללשונית "ייבוא"</strong>
+      <p>גללו מטה לאזור "גיבוי ושחזור".</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-content">
+      <strong>לחצו "גיבוי"</strong>
+      <p>יירד קובץ JSON עם כל הנתונים שלכם.</p>
+    </div>
+  </div>
+</div>
+
+<h3>שחזור מגיבוי</h3>
+<div class="steps">
+  <div class="step">
+    <div class="step-content">
+      <strong>לחצו "שחזור"</strong>
+      <p>בחרו את קובץ ה-JSON שגיביתם — הנתונים ישוחזרו.</p>
+    </div>
+  </div>
+</div>
+
+<h3>ייצוא ל-CSV</h3>
+<p>מלשונית "עסקאות" — לחצו "ייצוא CSV" כדי לייצא את כל העסקאות לגיליון אלקטרוני.</p>
+
+<h3>ניקוי כל הנתונים</h3>
+<p>
+  באזור הגיבוי יש גם כפתור <strong>"נקה הכל"</strong> — שימו לב, פעולה זו מוחקת את כל הנתונים ואינה ניתנת לביטול!
+  גבו את הנתונים לפני.
+</p>
+
+<!-- ========== 14. SECURITY ========== -->
+<h2 id="security">14. אבטחה ופרטיות</h2>
+
+<div class="security">
+  <span class="callout-icon">🛡️</span>
+  <div class="callout-text">
+    <strong>כל הנתונים מוצפנים ונשמרים אך ורק על המכשיר שלך</strong>
+    המידע שלך לא נשלח לאף שרת. אין ענן, אין צד שלישי.
+  </div>
+</div>
+
+<h3>שכבות ההגנה</h3>
+
+<table>
+  <thead><tr><th>שכבה</th><th>טכנולוגיה</th><th>הסבר</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>🔐 הצפנת נתונים</td>
+      <td>AES-256-GCM</td>
+      <td>כל המידע מוצפן ב-localStorage עם מפתח שנגזר מה-PIN שלכם</td>
+    </tr>
+    <tr>
+      <td>🔑 גזירת מפתח</td>
+      <td>PBKDF2 (100,000 סבבים)</td>
+      <td>ה-PIN הופך למפתח הצפנה חזק באמצעות פונקציה איטית שמקשה על פריצה</td>
+    </tr>
+    <tr>
+      <td>🛡️ הגנת XSS</td>
+      <td>פונקציית esc()</td>
+      <td>כל טקסט שמוזן עובר סניטציה למניעת הזרקת קוד</td>
+    </tr>
+    <tr>
+      <td>📜 שלמות ספריות</td>
+      <td>SRI (Subresource Integrity)</td>
+      <td>הספריות החיצוניות (Chart.js, PapaParse) נטענות עם hash לוידוא שלמות</td>
+    </tr>
+    <tr>
+      <td>📊 הגנת CSV</td>
+      <td>safeCSV()</td>
+      <td>ייצוא CSV מונע הזרקת נוסחאות זדוניות</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>מה לא לעשות</h3>
+<ul>
+  <li>❌ <strong>אל תעלו את הקובץ לענן</strong> — שמרו אותו רק על המחשב שלכם.</li>
+  <li>❌ <strong>אל תשתפו את הקובץ</strong> — הוא מכיל את הנתונים שלכם ב-localStorage של הדפדפן.</li>
+  <li>❌ <strong>אל תשכחו את ה-PIN</strong> — אין שחזור!</li>
+</ul>
+
+<h3>מה כן לעשות</h3>
+<ul>
+  <li>✅ <strong>גבו באופן קבוע</strong> — השתמשו בכפתור "גיבוי" ושמרו את הקובץ במקום בטוח.</li>
+  <li>✅ <strong>השתמשו ב-PIN חזק</strong> — לפחות 4 תווים, מומלץ 6+.</li>
+  <li>✅ <strong>נעלו לפני עזיבה</strong> — לחצו 🔒 כשאתם עוזבים את המחשב.</li>
+</ul>
+
+<!-- ========== 15. FAQ ========== -->
+<h2 id="faq">15. שאלות נפוצות</h2>
+
+<h3>האפליקציה לא מזהה את קובץ ה-CSV שלי</h3>
+<p>
+  ודאו שהורדתם את הקובץ ב<strong>פורמט CSV</strong> (לא Excel/XLSX).
+  פתחו את הקובץ בפנקס רשימות (Notepad) ובדקו שהשורה הראשונה מכילה כותרות עם "תאריך עסקה" ו"סכום חיוב".
+  אם הקובץ מכיל שורות ריקות בהתחלה, נסו למחוק אותן.
+</p>
+
+<h3>חלק מהעסקאות מופיעות בקטגוריה "אחר"</h3>
+<p>
+  המערכת מזהה אוטומטית מאות בתי עסק ישראליים נפוצים. עסקאות שלא זוהו מסווגות כ"אחר".
+  לחצו על תג הקטגוריה בלשונית "עסקאות" כדי לשנות ידנית.
+</p>
+
+<h3>איך מחליפים שפה?</h3>
+<p>
+  לחצו על כפתור <kbd>EN / עב</kbd> בפינה העליונה של האפליקציה.
+</p>
+
+<h3>אפשר להשתמש בטלפון?</h3>
+<p>
+  כן! האפליקציה רספונסיבית ועובדת בדפדפן בטלפון.
+  פשוט פתחו את קובץ ה-HTML בדפדפן הטלפון (למשל דרך שליחת הקובץ לעצמכם בוואטסאפ).
+  שימו לב: "מצב בוקר קפה" לא זמין בטלפון.
+</p>
+
+<h3>מה קורה אם אני מנקה את הדפדפן?</h3>
+<p>
+  ניקוי היסטוריה / מטמון עלול למחוק את ה-localStorage — ואיתו את כל הנתונים!
+  <strong>גבו באופן קבוע</strong> באמצעות כפתור הגיבוי.
+</p>
+
+<h3>אפשר לנהל כמה כרטיסי אשראי?</h3>
+<p>
+  בהחלט! ייבאו CSV מכל כרטיס בנפרד — האפליקציה תצרף את הכל יחד.
+  בסינון ובגרפים תוכלו לראות את הפילוח לפי מקור (חברת אשראי).
+</p>
+
+<h3>איך מוסיפים נתוני דוגמה?</h3>
+<p>
+  בלשונית "ייבוא" יש כפתור <strong>"טען נתוני דוגמה"</strong> — שימושי לנסות את האפליקציה לפני שמייבאים נתונים אמיתיים.
+</p>
+
+<!-- ========== CATEGORIES REF ========== -->
+<div class="page-break"></div>
+<h2>נספח: רשימת קטגוריות</h2>
+
+<table>
+  <thead><tr><th>סמל</th><th>קטגוריה</th><th>דוגמאות זיהוי אוטומטי</th></tr></thead>
+  <tbody>
+    <tr><td>🛒</td><td>סופרמרקט</td><td>שופרסל, רמי לוי, מגה, חצי חינם, יוחננוף, טיב טעם</td></tr>
+    <tr><td>🍕</td><td>מסעדות</td><td>ארומה, לנדוור, מקדונלד, Wolt, 10Bis, דומינו</td></tr>
+    <tr><td>⛽</td><td>דלק</td><td>סונול, פז, דור אלון, Ten, Yellow</td></tr>
+    <tr><td>👕</td><td>ביגוד</td><td>H&M, זארה, קסטרו, Fox, גולף, SHEIN</td></tr>
+    <tr><td>💊</td><td>בריאות</td><td>סופר פארם, מכבי, כללית, לאומית, מאוחדת</td></tr>
+    <tr><td>🚌</td><td>תחבורה</td><td>רכבת ישראל, אגד, Gett, Yango, רב קו</td></tr>
+    <tr><td>🎬</td><td>בילויים</td><td>סינמה סיטי, Netflix, Spotify, יס פלאנט</td></tr>
+    <tr><td>📄</td><td>חשבונות</td><td>חברת חשמל, מקורות, בזק, פרטנר, סלקום</td></tr>
+    <tr><td>📚</td><td>חינוך</td><td>חדר כושר, חוג, קורס, אוניברסיטה</td></tr>
+    <tr><td>🛍️</td><td>קניות אונליין</td><td>Amazon, AliExpress, eBay, iHerb, Temu</td></tr>
+    <tr><td>🛡️</td><td>ביטוח</td><td>הראל, מגדל, כלל, הפניקס, מנורה</td></tr>
+    <tr><td>🔄</td><td>מנויים</td><td>נטפליקס, ספוטיפיי, Apple, Google Play</td></tr>
+    <tr><td>🏠</td><td>בית</td><td>איקאה, הום סנטר, ACE</td></tr>
+    <tr><td>👶</td><td>ילדים</td><td>צעצועים, גן, מעון</td></tr>
+    <tr><td>💸</td><td>העברות</td><td>ביט, PayBox, פייפאל, פפר</td></tr>
+    <tr><td>📦</td><td>אחר</td><td>כל מה שלא זוהה אוטומטית</td></tr>
+  </tbody>
+</table>
+
+<!-- ========== FOOTER ========== -->
+<div class="footer">
+  <p>ExpenseIL · מדריך שימוש · גרסה 1.0</p>
+  <p>כל הנתונים מוצפנים ונשמרים אך ורק על המכשיר שלך 🔐</p>
+</div>
+
+</div><!-- /container -->
+</body>
+</html>
